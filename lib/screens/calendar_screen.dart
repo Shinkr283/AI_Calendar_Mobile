@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../services/event_service.dart';
 import '../models/event.dart';
+import '../widgets/event_form.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -47,8 +48,85 @@ class _CalendarScreenState extends State<CalendarScreen> {
     });
   }
 
-  void _onAddEvent() {
-    // TODO: 일정 추가 다이얼로그/화면 띄우기
+  void _onAddEvent() async {
+    final newEvent = await showDialog<Event>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('일정 추가'),
+        content: EventForm(
+          onSave: (event) {
+            Navigator.of(context).pop(event);
+          },
+        ),
+      ),
+    );
+    if (newEvent != null) {
+      await EventService().createEvent(
+        title: newEvent.title,
+        description: newEvent.description,
+        startTime: newEvent.startTime,
+        endTime: newEvent.endTime,
+        location: newEvent.location,
+        category: newEvent.category,
+        priority: newEvent.priority,
+        isAllDay: newEvent.isAllDay,
+        recurrenceRule: newEvent.recurrenceRule,
+        attendees: newEvent.attendees,
+        color: newEvent.color,
+      );
+      _loadEventsForDay(_selectedDay!);
+    }
+  }
+
+  void _onEditEvent(Event event) async {
+    final updatedEvent = await showDialog<Event>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('일정 수정'),
+        content: EventForm(
+          initialEvent: event,
+          onSave: (e) {
+            Navigator.of(context).pop(e);
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              // 삭제 기능
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('일정 삭제'),
+                  content: const Text('정말로 이 일정을 삭제하시겠습니까?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('취소'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('삭제'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                await EventService().deleteEvent(event.id);
+                Navigator.of(context).pop();
+              }
+            },
+            child: const Text('삭제', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (updatedEvent != null) {
+      await EventService().updateEvent(updatedEvent);
+      _loadEventsForDay(_selectedDay!);
+    } else {
+      // 삭제된 경우에도 목록 갱신
+      _loadEventsForDay(_selectedDay!);
+    }
   }
 
   @override
@@ -121,7 +199,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                               subtitle: Text(event.description),
                               trailing: Text(EventCategory.getDisplayName(event.category)),
                               onTap: () {
-                                // TODO: 일정 상세/수정 화면 띄우기
+                                _onEditEvent(event);
                               },
                             ),
                           );

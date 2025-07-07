@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-// 서비스 import 추가
 import 'services/database_service.dart';
 import 'services/event_service.dart';
 import 'services/user_service.dart';
@@ -21,7 +20,7 @@ class AICalendarApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
         title: 'AI 캘린더',
-        theme: ThemeData(
+      theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
             seedColor: Colors.blue,
             brightness: Brightness.light,
