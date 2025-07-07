@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "650488140348",
+    "project_id": "ai-calendar-49fe2",
+    "storage_bucket": "ai-calendar-49fe2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:650488140348:android:f673c065eee1e51ff02939",
+        "android_client_info": {
+          "package_name": "com.example.ai_calendar_mobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "650488140348-55u7489it38fpi3b42bvrfh9gv0ndb19.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.ai_calendar_mobile",
+            "certificate_hash": "a737e1f3b8840f67fe22bb1e099b6a9ef8b046d9"
+          }
+        },
+        {
+          "client_id": "650488140348-9s9u98hfrupghbnerc5340q334ll70di.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDaD495tfaBlyljHekM1h-HQvzXfnCGWiE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "650488140348-9s9u98hfrupghbnerc5340q334ll70di.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -3,6 +3,8 @@ import 'package:table_calendar/table_calendar.dart';
 import '../services/event_service.dart';
 import '../models/event.dart';
 import '../widgets/event_form.dart';
+import 'calendar_sync_prompt_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -23,6 +25,32 @@ class _CalendarScreenState extends State<CalendarScreen> {
     super.initState();
     _selectedDay = _focusedDay;
     _loadEventsForDay(_selectedDay!);
+    _showSyncPromptIfNeeded();
+  }
+
+  Future<void> _showSyncPromptIfNeeded() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeenSyncPrompt = prefs.getBool('hasSeenSyncPrompt') ?? false;
+    if (!hasSeenSyncPrompt) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => CalendarSyncPromptScreen(
+            onSyncComplete: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('hasSeenSyncPrompt', true);
+              Navigator.maybePop(dialogContext);
+            },
+            onSkip: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('hasSeenSyncPrompt', true);
+              Navigator.maybePop(dialogContext);
+            },
+          ),
+        );
+      });
+    }
   }
 
   Future<void> _loadEventsForDay(DateTime day) async {
