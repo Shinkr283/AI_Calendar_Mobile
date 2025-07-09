@@ -11,6 +11,8 @@ import 'screens/calendar_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'screens/google_login_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'screens/weather_screen.dart'; // Added import for WeatherScreen
+import 'screens/map_screen.dart'; // MapScreen import 추가
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -353,30 +355,50 @@ class SettingsTabScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: const Center(
+      body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
+            const Icon(
               Icons.settings,
               size: 64,
               color: Colors.orange,
             ),
-            SizedBox(height: 16),
-            Text(
+            const SizedBox(height: 16),
+            const Text(
               '설정 화면',
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 8),
-            Text(
+            const SizedBox(height: 8),
+            const Text(
               '앱 설정 기능이 여기에 들어갑니다',
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
-            SizedBox(height: 16),
-            Text(
+            const SizedBox(height: 16),
+            const Text(
               '🐛 우상단 버그 아이콘을 눌러서 사용자 서비스를 테스트해보세요!',
               style: TextStyle(fontSize: 14, color: Colors.orange),
               textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const WeatherScreen()),
+                );
+              },
+              child: const Text('날씨 정보 보기'),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const MapScreen()),
+                );
+              },
+              child: const Text('내 위치 지도 보기'),
             ),
           ],
         ),
