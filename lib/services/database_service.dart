@@ -162,6 +162,20 @@ class DatabaseService {
     return null;
   }
 
+  Future<UserProfile?> getFirstUserProfile() async {
+    final db = await database;
+    final maps = await db.query(
+      'user_profiles',
+      limit: 1,
+      orderBy: 'createdAt ASC',
+    );
+
+    if (maps.isNotEmpty) {
+      return UserProfile.fromMap(maps.first);
+    }
+    return null;
+  }
+
   Future<int> updateUserProfile(UserProfile profile) async {
     final db = await database;
     return await db.update(

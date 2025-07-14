@@ -93,6 +93,7 @@ dependencies:
 
   googleapis: ^11.0.0
   googleapis_auth: ^1.4.0
+  google_generative_ai: ^0.4.7
 
 dev_dependencies:
   flutter_test:
@@ -155,6 +156,7 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - .env
 
   # 폰트 (나중에 추가할 예정)
   # fonts:

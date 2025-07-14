@@ -13,11 +13,30 @@ import 'screens/google_login_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'screens/weather_screen.dart'; // Added import for WeatherScreen
 import 'screens/map_screen.dart'; // MapScreen import 추가
+import 'screens/chat_screen.dart';//추가
+import 'package:flutter_dotenv/flutter_dotenv.dart';//추가
+import 'package:intl/date_symbol_data_local.dart';//추가
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // .env 파일 로드
+  await dotenv.load(fileName: ".env");
+  
+  // Firebase 초기화
   await Firebase.initializeApp();
-  runApp(const AICalendarApp());
+  
+  // 한국어 날짜 포맷 초기화
+  await initializeDateFormatting('ko_KR', null);
+
+  runApp(MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ChatProvider()),
+        
+      ],
+      child: const AICalendarApp(),
+    ),
+  );// 수정된 코드
 }
 
 class AICalendarApp extends StatelessWidget {
@@ -81,7 +100,7 @@ class _MainScreenState extends State<MainScreen> {
   // 각 탭의 화면들 (나중에 실제 화면으로 교체할 예정)
   final List<Widget> _screens = [
     const CalendarScreen(),
-    const ChatTabScreen(),
+    const ChatScreen(),
     const SettingsTabScreen(),
   ];
 
@@ -200,114 +219,6 @@ class CalendarTabScreen extends StatelessWidget {
                 Text('오늘 일정 개수: ${todayEvents.length}개'),
                 const SizedBox(height: 8),
                 const Text('데이터베이스가 정상적으로 작동합니다!'),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('확인'),
-              ),
-            ],
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('❌ 테스트 실패'),
-            content: Text('오류: $e'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('확인'),
-              ),
-            ],
-          ),
-        );
-      }
-    }
-  }
-}
-
-class ChatTabScreen extends StatelessWidget {
-  const ChatTabScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('AI 비서'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.bug_report),
-            onPressed: () => _testChatService(context),
-            tooltip: '채팅 서비스 테스트',
-          ),
-        ],
-      ),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.smart_toy,
-              size: 64,
-              color: Colors.green,
-            ),
-            SizedBox(height: 16),
-            Text(
-              'AI 비서 화면',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'AI 챗봇 기능이 여기에 들어갑니다',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-            SizedBox(height: 16),
-            Text(
-              '🐛 우상단 버그 아이콘을 눌러서 채팅 서비스를 테스트해보세요!',
-              style: TextStyle(fontSize: 14, color: Colors.orange),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _testChatService(BuildContext context) async {
-    try {
-      final chatService = ChatService();
-      
-      // 테스트 채팅 세션 생성
-      final session = await chatService.createChatSession(title: '테스트 대화');
-      
-      // 테스트 메시지 추가
-      final userMessage = await chatService.addUserMessage('안녕하세요! 테스트 메시지입니다.');
-      final aiMessage = await chatService.addAssistantMessage('안녕하세요! AI 비서입니다. 무엇을 도와드릴까요?');
-      
-      // 메시지 조회
-      final messages = await chatService.getCurrentSessionMessages();
-      
-      if (context.mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('✅ 채팅 서비스 테스트 성공!'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('세션 생성: ${session.title}'),
-                Text('세션 ID: ${session.id}'),
-                Text('사용자 메시지: ${userMessage.content}'),
-                Text('AI 메시지: ${aiMessage.content}'),
-                Text('총 메시지 수: ${messages.length}개'),
-                const SizedBox(height: 8),
-                const Text('채팅 시스템이 정상적으로 작동합니다!'),
               ],
             ),
             actions: [

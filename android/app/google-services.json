@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "650488140348-8odost69meftuagu3kor55pgldm7bonu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.ai_calendar_mobile",
+            "certificate_hash": "6688e410aa647eefee712d75e8ca0595637662dc"
+          }
+        },
+        {
           "client_id": "650488140348-9s9u98hfrupghbnerc5340q334ll70di.apps.googleusercontent.com",
           "client_type": 3
         }

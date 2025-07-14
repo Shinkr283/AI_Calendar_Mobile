@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import '../models/user_profile.dart';
+import '../models/chat_mbti.dart';//추가
 import 'database_service.dart';
 
 class UserService {
@@ -62,6 +63,7 @@ class UserService {
     
     // 데이터베이스에서 첫 번째 사용자를 현재 사용자로 설정
     // 실제 앱에서는 로그인 시스템과 연동해야 함
+    _currentUser = await _databaseService.getFirstUserProfile(); //추가
     return _currentUser;
   }
 
@@ -128,9 +130,8 @@ class UserService {
   // MBTI 타입 설정
   Future<UserProfile?> setMBTIType(String mbtiType) async {
     final currentUser = await getCurrentUser();
-    if (currentUser != null && MBTIType.isValid(mbtiType)) {
-      // MBTI에 따른 AI 성격 자동 설정
-      final recommendedPersonality = MBTIType.getRecommendedAIPersonality(mbtiType);
+    if (currentUser != null && MbtiData.isValid(mbtiType)) {
+      final recommendedPersonality = MbtiData.getChatbotProfile(mbtiType).personalityKeyword; // MBTI에 따른 AI 성격 자동 설정 (수정된 부분)
       
       final updatedUser = currentUser.copyWith(
         mbtiType: mbtiType.toUpperCase(),
