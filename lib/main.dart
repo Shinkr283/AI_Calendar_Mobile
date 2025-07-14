@@ -4,6 +4,7 @@ import 'services/database_service.dart';
 import 'services/event_service.dart';
 import 'services/user_service.dart';
 import 'services/chat_service.dart';
+import 'services/notification_service.dart';
 import 'models/event.dart';
 import 'models/user_profile.dart';
 import 'models/chat_message.dart';
@@ -16,6 +17,7 @@ import 'screens/map_screen.dart'; // MapScreen import 추가
 import 'screens/chat_screen.dart';//추가
 import 'package:flutter_dotenv/flutter_dotenv.dart';//추가
 import 'package:intl/date_symbol_data_local.dart';//추가
+import 'package:permission_handler/permission_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +30,11 @@ void main() async {
   
   // 한국어 날짜 포맷 초기화
   await initializeDateFormatting('ko_KR', null);
+
+  await NotificationService().init();
+  if (await Permission.notification.isDenied) {
+    await Permission.notification.request();
+  }
 
   runApp(MultiProvider(
       providers: [

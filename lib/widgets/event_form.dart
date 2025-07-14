@@ -3,7 +3,7 @@ import '../models/event.dart';
 
 class EventForm extends StatefulWidget {
   final Event? initialEvent;
-  final void Function(Event event) onSave;
+  final void Function(Event event, int alarmMinutesBefore) onSave;
 
   const EventForm({
     super.key,
@@ -23,6 +23,8 @@ class _EventFormState extends State<EventForm> {
   late DateTime _endTime;
   late String _category;
   late int _priority;
+  int _alarmMinutesBefore = 10; // 기본값 10분 전
+  final List<int> _alarmOptions = [0, 5, 10, 15, 30, 60, 120];
 
   @override
   void initState() {
@@ -85,7 +87,7 @@ class _EventFormState extends State<EventForm> {
         createdAt: widget.initialEvent?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
       );
-      widget.onSave(event);
+      widget.onSave(event, _alarmMinutesBefore);
     }
   }
 
@@ -149,6 +151,18 @@ class _EventFormState extends State<EventForm> {
                 DropdownMenuItem(value: EventPriority.high, child: Text('높음')),
               ],
               onChanged: (v) => setState(() => _priority = v ?? EventPriority.medium),
+            ),
+            // 알림 시간 설정
+            DropdownButtonFormField<int>(
+              value: _alarmMinutesBefore,
+              decoration: const InputDecoration(labelText: '알림 시간'),
+              items: _alarmOptions
+                  .map((m) => DropdownMenuItem(
+                        value: m,
+                        child: Text(m == 0 ? '알림 없음' : '$m분 전'),
+                      ))
+                  .toList(),
+              onChanged: (v) => setState(() => _alarmMinutesBefore = v ?? 10),
             ),
             const SizedBox(height: 16),
             ElevatedButton(

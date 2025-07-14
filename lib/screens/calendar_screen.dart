@@ -5,6 +5,7 @@ import '../models/event.dart';
 import '../widgets/event_form.dart';
 import 'calendar_sync_prompt_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/notification_service.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -77,18 +78,23 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   void _onAddEvent() async {
-    final newEvent = await showDialog<Event>(
+    final result = await showDialog<Map<String, dynamic>>( // Event와 알림 분을 함께 받기 위해 Map으로 받음
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('일정 추가'),
         content: EventForm(
-          onSave: (event) {
-            Navigator.of(context).pop(event);
+          onSave: (event, alarmMinutesBefore) {
+            Navigator.of(context).pop({
+              'event': event,
+              'alarmMinutesBefore': alarmMinutesBefore,
+            });
           },
         ),
       ),
     );
-    if (newEvent != null) {
+    if (result != null) {
+      final newEvent = result['event'] as Event;
+      final alarmMinutesBefore = result['alarmMinutesBefore'] as int;
       await EventService().createEvent(
         title: newEvent.title,
         description: newEvent.description,
@@ -102,19 +108,31 @@ class _CalendarScreenState extends State<CalendarScreen> {
         attendees: newEvent.attendees,
         color: newEvent.color,
       );
+      // 알림 예약: 사용자가 선택한 분 전
+      if (alarmMinutesBefore > 0) {
+        await NotificationService().scheduleNotification(
+          id: newEvent.id.hashCode,
+          scheduledTime: newEvent.startTime.subtract(Duration(minutes: alarmMinutesBefore)),
+          title: '일정 알림',
+          body: '${newEvent.title} 일정이 곧 시작됩니다!',
+        );
+      }
       _loadEventsForDay(_selectedDay!);
     }
   }
 
   void _onEditEvent(Event event) async {
-    final updatedEvent = await showDialog<Event>(
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('일정 수정'),
         content: EventForm(
           initialEvent: event,
-          onSave: (e) {
-            Navigator.of(context).pop(e);
+          onSave: (e, alarmMinutesBefore) {
+            Navigator.of(context).pop({
+              'event': e,
+              'alarmMinutesBefore': alarmMinutesBefore,
+            });
           },
         ),
         actions: [
@@ -148,8 +166,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
         ],
       ),
     );
-    if (updatedEvent != null) {
+    if (result != null) {
+      final updatedEvent = result['event'] as Event;
+      final alarmMinutesBefore = result['alarmMinutesBefore'] as int;
       await EventService().updateEvent(updatedEvent);
+      // 알림 예약: 사용자가 선택한 분 전
+      if (alarmMinutesBefore > 0) {
+        await NotificationService().scheduleNotification(
+          id: updatedEvent.id.hashCode,
+          scheduledTime: updatedEvent.startTime.subtract(Duration(minutes: alarmMinutesBefore)),
+          title: '일정 알림',
+          body: '${updatedEvent.title} 일정이 곧 시작됩니다!',
+        );
+      }
       _loadEventsForDay(_selectedDay!);
     } else {
       // 삭제된 경우에도 목록 갱신
