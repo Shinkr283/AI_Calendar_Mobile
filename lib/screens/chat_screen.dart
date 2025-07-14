@@ -9,8 +9,6 @@ class ChatScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ChatProvider 인스턴스를 가져옵니다.
-    final chatProvider = Provider.of<ChatProvider>(context);
     final user = const types.User(id: 'user'); // 사용자 정보는 여기서 정의
 
     return Scaffold(

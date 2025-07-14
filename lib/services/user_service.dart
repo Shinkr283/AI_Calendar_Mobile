@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import '../models/user_profile.dart';
-import '../models/chat_mbti.dart';//추가
+import '../models/chat_mbti.dart';
 import 'database_service.dart';
 
 class UserService {

@@ -21,13 +21,10 @@ import 'package:permission_handler/permission_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
   // .env 파일 로드
   await dotenv.load(fileName: ".env");
-  
   // Firebase 초기화
   await Firebase.initializeApp();
-  
   // 한국어 날짜 포맷 초기화
   await initializeDateFormatting('ko_KR', null);
 

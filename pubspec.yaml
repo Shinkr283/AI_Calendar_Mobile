@@ -93,7 +93,7 @@ dependencies:
 
   googleapis: ^11.0.0
   googleapis_auth: ^1.4.0
-  google_generative_ai: ^0.4.7
+  # google_generative_ai: ^0.4.7
 
   # === 알림 ===
   flutter_local_notifications: ^19.3.0

@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:json_annotation/json_annotation.dart';
-import 'chat_mbti.dart'; // 새로 만든 MBTI 파일 import
 
 part 'user_profile.g.dart';
 
