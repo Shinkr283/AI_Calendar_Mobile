@@ -15,7 +15,6 @@ class CalendarScreen extends StatefulWidget {
 }
 
 class _CalendarScreenState extends State<CalendarScreen> {
-  CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   List<Event> _events = [];
@@ -25,7 +24,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   void initState() {
     super.initState();
     _selectedDay = _focusedDay;
-    _loadEventsForDay(_selectedDay!);
+    _loadEventsForMonth(_focusedDay);
     _showSyncPromptIfNeeded();
   }
 
@@ -54,9 +53,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
-  Future<void> _loadEventsForDay(DateTime day) async {
+  Future<void> _loadEventsForMonth(DateTime month) async {
     setState(() => _isLoading = true);
-    final events = await EventService().getEventsForDate(day);
+    final events = await EventService().getEventsForMonth(month);
     setState(() {
       _events = events;
       _isLoading = false;
@@ -68,13 +67,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       _selectedDay = selectedDay;
       _focusedDay = focusedDay;
     });
-    _loadEventsForDay(selectedDay);
-  }
-
-  void _onFormatChanged(CalendarFormat format) {
-    setState(() {
-      _calendarFormat = format;
-    });
+    // 날짜를 선택해도 월 전체 일정을 유지
   }
 
   void _onAddEvent() async {
@@ -117,7 +110,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           body: '${newEvent.title} 일정이 곧 시작됩니다!',
         );
       }
-      _loadEventsForDay(_selectedDay!);
+      _loadEventsForMonth(_focusedDay);
     }
   }
 
@@ -179,10 +172,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
           body: '${updatedEvent.title} 일정이 곧 시작됩니다!',
         );
       }
-      _loadEventsForDay(_selectedDay!);
+      _loadEventsForMonth(_focusedDay);
     } else {
       // 삭제된 경우에도 목록 갱신
-      _loadEventsForDay(_selectedDay!);
+      _loadEventsForMonth(_focusedDay);
     }
   }
 
@@ -199,45 +192,211 @@ class _CalendarScreenState extends State<CalendarScreen> {
             firstDay: DateTime.utc(2020, 1, 1),
             lastDay: DateTime.utc(2100, 12, 31),
             focusedDay: _focusedDay,
-            calendarFormat: _calendarFormat,
+            calendarFormat: CalendarFormat.month,
             selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
             onDaySelected: _onDaySelected,
-            onFormatChanged: _onFormatChanged,
-            eventLoader: (day) =>
-                _selectedDay != null && isSameDay(day, _selectedDay!) ? _events : [],
+            eventLoader: (day) => _events.where((e) => isSameDay(e.startTime, day)).toList(),
             headerStyle: const HeaderStyle(
-              formatButtonVisible: true,
+              formatButtonVisible: false,
               titleCentered: true,
             ),
-          ),
-          const SizedBox(height: 8),
-          ToggleButtons(
-            isSelected: [
-              _calendarFormat == CalendarFormat.month,
-              _calendarFormat == CalendarFormat.week,
-              _calendarFormat == CalendarFormat.twoWeeks,
-            ],
-            onPressed: (index) {
-              setState(() {
-                if (index == 0) _calendarFormat = CalendarFormat.month;
-                if (index == 1) _calendarFormat = CalendarFormat.week;
-                if (index == 2) _calendarFormat = CalendarFormat.twoWeeks;
-              });
-            },
-            children: const [
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: Text('월'),
-              ),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: Text('주'),
-              ),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: Text('2주'),
-              ),
-            ],
+            calendarStyle: const CalendarStyle(
+              markerMargin: EdgeInsets.zero,
+              markersMaxCount: 10,
+              markerSize: 0,
+            ),
+            calendarBuilders: CalendarBuilders(
+              defaultBuilder: (context, day, focusedDay) {
+                final dayEvents = _events.where((e) => isSameDay(e.startTime, day)).toList();
+                return Container(
+                  alignment: Alignment.topCenter,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 4),
+                      Text('${day.day}', textAlign: TextAlign.center),
+                      if (dayEvents.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            dayEvents.first.title.length > 8
+                                ? dayEvents.first.title.substring(0, 8) + '...'
+                                : dayEvents.first.title,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.blueAccent,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            maxLines: 1,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+              todayBuilder: (context, day, focusedDay) {
+                final dayEvents = _events.where((e) => isSameDay(e.startTime, day)).toList();
+                return Container(
+                  alignment: Alignment.topCenter,
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 4),
+                      Text('${day.day}', style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                      if (dayEvents.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            dayEvents.first.title.length > 8
+                                ? dayEvents.first.title.substring(0, 8) + '...'
+                                : dayEvents.first.title,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.blueAccent,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            maxLines: 1,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+              selectedBuilder: (context, day, focusedDay) {
+                final dayEvents = _events.where((e) => isSameDay(e.startTime, day)).toList();
+                return Container(
+                  alignment: Alignment.topCenter,
+                  decoration: BoxDecoration(
+                    color: Colors.blue,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 4),
+                      Text('${day.day}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                      if (dayEvents.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            dayEvents.first.title.length > 8
+                                ? dayEvents.first.title.substring(0, 8) + '...'
+                                : dayEvents.first.title,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.white,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            maxLines: 1,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+              outsideBuilder: (context, day, focusedDay) {
+                final dayEvents = _events.where((e) => isSameDay(e.startTime, day)).toList();
+                return Container(
+                  alignment: Alignment.topCenter,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 4),
+                      Text('${day.day}', style: const TextStyle(color: Colors.grey), textAlign: TextAlign.center),
+                      if (dayEvents.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            dayEvents.first.title.length > 8
+                                ? dayEvents.first.title.substring(0, 8) + '...'
+                                : dayEvents.first.title,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            maxLines: 1,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+              markerBuilder: (context, day, events) {
+                final monthEvents = _events
+                    .where((e) => !e.isAllDay && !e.isCompleted && (e.startTime.month == day.month || e.endTime.month == day.month))
+                    .toList();
+                monthEvents.sort((a, b) => a.startTime.compareTo(b.startTime));
+                final Map<String, int> eventLineMap = {};
+                int line = 0;
+                for (final event in monthEvents) {
+                  eventLineMap[event.id] = line++;
+                }
+
+                final todayEvents = monthEvents.where((e) => !e.startTime.isAfter(day) && !e.endTime.isBefore(day)).toList();
+                if (todayEvents.isEmpty) return const SizedBox.shrink();
+
+                return Stack(
+                  children: todayEvents.take(3).map((event) {
+                    final idx = eventLineMap[event.id] ?? 0;
+                    final isStart = isSameDay(event.startTime, day);
+                    final isEnd = isSameDay(event.endTime, day);
+                    final isSingle = isStart && isEnd;
+                    BorderRadius borderRadius;
+                    double left = 2, right = 2;
+                    if (isSingle) {
+                      borderRadius = BorderRadius.circular(6);
+                    } else if (isStart) {
+                      borderRadius = const BorderRadius.horizontal(left: Radius.circular(6));
+                      right = 0;
+                    } else if (isEnd) {
+                      borderRadius = const BorderRadius.horizontal(right: Radius.circular(6));
+                      left = 0;
+                    } else {
+                      borderRadius = BorderRadius.zero;
+                      left = 0;
+                      right = 0;
+                    }
+                    return Positioned(
+                      left: left,
+                      right: right,
+                      top: 24.0 + idx * 16.0,
+                      height: 16,
+                      child: Container(
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Colors.lightBlue,
+                          borderRadius: borderRadius,
+                        ),
+                        child: Text(
+                          event.title.length > 8 ? event.title.substring(0, 8) + '…' : event.title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          maxLines: 1,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
           ),
           const SizedBox(height: 8),
           Expanded(
