@@ -60,6 +60,7 @@ dependencies:
   
   # 채팅 UI
   flutter_chat_ui: ^1.6.15
+  flutter_chat_types: ^3.6.2
   
   # 위치 서비스
   geolocator: ^13.0.2

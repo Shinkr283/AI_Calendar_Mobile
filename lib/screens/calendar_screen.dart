@@ -6,6 +6,7 @@ import '../widgets/event_form.dart';
 import 'calendar_sync_prompt_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/notification_service.dart';
+import '../services/calendar_sync_service.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -185,6 +186,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
       appBar: AppBar(
         title: const Text('캘린더'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.sync),
+            tooltip: '구글 캘린더 동기화',
+            onPressed: _onSyncWithGoogle,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -430,5 +438,24 @@ class _CalendarScreenState extends State<CalendarScreen> {
         tooltip: '일정 추가',
       ),
     );
+  }
+  
+  Future<void> _onSyncWithGoogle() async {
+    setState(() => _isLoading = true);
+    try {
+      final inserted = await CalendarSyncService().syncCurrentMonth(readonly: true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('동기화 완료: ${inserted}건')),
+      );
+      await _loadEventsForMonth(_focusedDay);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('동기화 실패: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 } 

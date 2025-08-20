@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'calendar_sync_prompt_screen.dart';
-import 'calendar_screen.dart';
+// import 'calendar_sync_prompt_screen.dart';
+// import 'calendar_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class GoogleLoginScreen extends StatefulWidget {
   const GoogleLoginScreen({super.key});
@@ -23,9 +24,9 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
     });
     try {
       final GoogleSignInAccount? googleUser = await GoogleSignIn(
-        scopes: [
+        scopes: const [
           'email',
-          'https://www.googleapis.com/auth/calendar', // 캘린더 접근 권한
+          'https://www.googleapis.com/auth/calendar.readonly',
         ],
       ).signIn();
       if (googleUser == null) {
@@ -40,6 +41,9 @@ class _GoogleLoginScreenState extends State<GoogleLoginScreen> {
         idToken: googleAuth.idToken,
       );
       final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      // 액세스 토큰 저장 (동기화에서 사용)
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('google_access_token', googleAuth.accessToken ?? '');
       setState(() {
         _user = userCredential.user;
         _isLoading = false;

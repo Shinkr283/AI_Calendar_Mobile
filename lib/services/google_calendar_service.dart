@@ -15,6 +15,27 @@ class GoogleCalendarService {
     final events = await calendarApi.events.list('primary');
     return events.items ?? [];
   }
+
+  Future<List<calendar.Event>> fetchEventsInRange({
+    required DateTime timeMin,
+    required DateTime timeMax,
+    bool singleEvents = true,
+    String orderBy = 'startTime',
+    String? timeZone,
+  }) async {
+    final client = GoogleHttpClient(accessToken);
+    final api = calendar.CalendarApi(client);
+    final res = await api.events.list(
+      'primary',
+      timeMin: timeMin.toUtc(),
+      timeMax: timeMax.toUtc(),
+      singleEvents: singleEvents,
+      orderBy: orderBy,
+      timeZone: timeZone,
+      maxResults: 2500,
+    );
+    return res.items ?? [];
+  }
 }
 
 // accessToken을 헤더에 자동으로 붙여주는 커스텀 http.Client

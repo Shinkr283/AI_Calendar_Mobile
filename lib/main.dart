@@ -18,9 +18,23 @@ import 'screens/chat_screen.dart';//추가
 import 'package:flutter_dotenv/flutter_dotenv.dart';//추가
 import 'package:intl/date_symbol_data_local.dart';//추가
 import 'package:permission_handler/permission_handler.dart';
+import 'package:geolocator/geolocator.dart';
+import 'services/location_service.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
+
+// 권한 요청 및 현재 위치 조회
+// 위치 권한 및 현재 위치는 LocationService에서 처리합니다.
+
+class KstTime {
+  static tz.TZDateTime now() => tz.TZDateTime.now(tz.local);
+  static tz.TZDateTime from(DateTime dt) => tz.TZDateTime.from(dt.toUtc(), tz.local);
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  tz.initializeTimeZones();
+  tz.setLocalLocation(tz.getLocation('Asia/Seoul'));
   // .env 파일 로드
   await dotenv.load(fileName: ".env");
   // Firebase 초기화
@@ -31,6 +45,13 @@ void main() async {
   await NotificationService().init();
   if (await Permission.notification.isDenied) {
     await Permission.notification.request();
+  }
+
+  try {
+    final pos = await LocationService().getCurrentPosition(accuracy: LocationAccuracy.high);
+    print('초기 위치: ${pos.latitude}, ${pos.longitude}');
+  } catch (e) {
+    print('초기 위치 확인 실패: $e');
   }
 
   runApp(MultiProvider(

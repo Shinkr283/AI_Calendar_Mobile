@@ -21,8 +21,8 @@ class _EventFormState extends State<EventForm> {
   late String _description;
   late DateTime _startTime;
   late DateTime _endTime;
-  late String _category;
-  late int _priority;
+  // late String _category;
+  // late int _priority;
   int _alarmMinutesBefore = 10; // 기본값 10분 전
   final List<int> _alarmOptions = [0, 5, 10, 15, 30, 60, 120];
 
@@ -34,8 +34,9 @@ class _EventFormState extends State<EventForm> {
     _description = e?.description ?? '';
     _startTime = e?.startTime ?? DateTime.now();
     _endTime = e?.endTime ?? DateTime.now().add(const Duration(hours: 1));
-    _category = e?.category ?? EventCategory.personal;
-    _priority = e?.priority ?? EventPriority.medium;
+    // 카테고리/우선순위 임시 고정
+    // _category = e?.category ?? EventCategory.personal;
+    // _priority = e?.priority ?? EventPriority.medium;
   }
 
   Future<void> _pickDateTime({required bool isStart}) async {
@@ -77,8 +78,8 @@ class _EventFormState extends State<EventForm> {
         startTime: _startTime,
         endTime: _endTime,
         location: '',
-        category: _category,
-        priority: _priority,
+        category: EventCategory.other,
+        priority: EventPriority.medium,
         isAllDay: false,
         recurrenceRule: null,
         attendees: [],
@@ -134,24 +135,7 @@ class _EventFormState extends State<EventForm> {
               ],
             ),
             const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: _category,
-              decoration: const InputDecoration(labelText: '카테고리'),
-              items: EventCategory.all
-                  .map((c) => DropdownMenuItem(value: c, child: Text(EventCategory.getDisplayName(c))))
-                  .toList(),
-              onChanged: (v) => setState(() => _category = v ?? EventCategory.personal),
-            ),
-            DropdownButtonFormField<int>(
-              value: _priority,
-              decoration: const InputDecoration(labelText: '우선순위'),
-              items: [
-                DropdownMenuItem(value: EventPriority.low, child: Text('낮음')),
-                DropdownMenuItem(value: EventPriority.medium, child: Text('보통')),
-                DropdownMenuItem(value: EventPriority.high, child: Text('높음')),
-              ],
-              onChanged: (v) => setState(() => _priority = v ?? EventPriority.medium),
-            ),
+            // 카테고리 / 우선순위 UI 잠시 비활성화
             // 알림 시간 설정
             DropdownButtonFormField<int>(
               value: _alarmMinutesBefore,
