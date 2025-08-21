@@ -6,7 +6,6 @@ import '../widgets/event_form.dart';
 import 'calendar_sync_prompt_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/notification_service.dart';
-import '../services/calendar_sync_service.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -186,13 +185,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
       appBar: AppBar(
         title: const Text('캘린더'),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.sync),
-            tooltip: '구글 캘린더 동기화',
-            onPressed: _onSyncWithGoogle,
-          ),
-        ],
       ),
       body: Column(
         children: [
@@ -420,7 +412,40 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                             child: ListTile(
                               title: Text(event.title),
-                              subtitle: Text(event.description),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (event.description.isNotEmpty) 
+                                    Text(event.description),
+                                  if (event.location.isNotEmpty) ...[
+                                    if (event.description.isNotEmpty) const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.place, size: 16, color: Colors.grey),
+                                        const SizedBox(width: 4),
+                                        Expanded(
+                                          child: Text(
+                                            event.location,
+                                            style: const TextStyle(
+                                              color: Colors.grey,
+                                              fontSize: 12,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                  Text(
+                                    '${event.startTime.hour.toString().padLeft(2, '0')}:${event.startTime.minute.toString().padLeft(2, '0')} - ${event.endTime.hour.toString().padLeft(2, '0')}:${event.endTime.minute.toString().padLeft(2, '0')}',
+                                    style: const TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
                               trailing: Text(EventCategory.getDisplayName(event.category)),
                               onTap: () {
                                 _onEditEvent(event);
@@ -438,24 +463,5 @@ class _CalendarScreenState extends State<CalendarScreen> {
         tooltip: '일정 추가',
       ),
     );
-  }
-  
-  Future<void> _onSyncWithGoogle() async {
-    setState(() => _isLoading = true);
-    try {
-      final inserted = await CalendarSyncService().syncCurrentMonth(readonly: true);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('동기화 완료: ${inserted}건')),
-      );
-      await _loadEventsForMonth(_focusedDay);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('동기화 실패: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
   }
 } 

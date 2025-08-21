@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/event.dart';
+import '../services/places_service.dart';
+import 'location_picker.dart';
 
 class EventForm extends StatefulWidget {
   final Event? initialEvent;
@@ -21,6 +23,8 @@ class _EventFormState extends State<EventForm> {
   late String _description;
   late DateTime _startTime;
   late DateTime _endTime;
+  String _location = '';
+  PlaceDetails? _selectedPlace;
   // late String _category;
   // late int _priority;
   int _alarmMinutesBefore = 10; // 기본값 10분 전
@@ -34,6 +38,7 @@ class _EventFormState extends State<EventForm> {
     _description = e?.description ?? '';
     _startTime = e?.startTime ?? DateTime.now();
     _endTime = e?.endTime ?? DateTime.now().add(const Duration(hours: 1));
+    _location = e?.location ?? '';
     // 카테고리/우선순위 임시 고정
     // _category = e?.category ?? EventCategory.personal;
     // _priority = e?.priority ?? EventPriority.medium;
@@ -68,6 +73,29 @@ class _EventFormState extends State<EventForm> {
     });
   }
 
+  void _pickLocation() async {
+    final result = await Navigator.of(context).push<PlaceDetails>(
+      MaterialPageRoute(
+        builder: (context) => LocationPicker(
+          initialLocation: _location,
+          onLocationSelected: (place) {
+            setState(() {
+              _selectedPlace = place;
+              _location = place.name;
+            });
+          },
+        ),
+      ),
+    );
+    
+    if (result != null) {
+      setState(() {
+        _selectedPlace = result;
+        _location = result.name;
+      });
+    }
+  }
+
   void _submit() {
     if (_formKey.currentState?.validate() ?? false) {
       _formKey.currentState?.save();
@@ -77,7 +105,7 @@ class _EventFormState extends State<EventForm> {
         description: _description,
         startTime: _startTime,
         endTime: _endTime,
-        location: '',
+        location: _location,
         category: EventCategory.other,
         priority: EventPriority.medium,
         isAllDay: false,
@@ -110,6 +138,59 @@ class _EventFormState extends State<EventForm> {
               initialValue: _description,
               decoration: const InputDecoration(labelText: '설명'),
               onSaved: (v) => _description = v ?? '',
+            ),
+            const SizedBox(height: 8),
+            // 장소 입력 필드
+            GestureDetector(
+              onTap: _pickLocation,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade400),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.place, color: Colors.grey.shade600),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '장소',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _location.isEmpty ? '장소를 선택하세요' : _location,
+                            style: TextStyle(
+                              color: _location.isEmpty ? Colors.grey.shade500 : Colors.black87,
+                              fontSize: 16,
+                            ),
+                          ),
+                          if (_selectedPlace != null && _selectedPlace!.address.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              _selectedPlace!.address,
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 12,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.chevron_right, color: Colors.grey.shade600),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 8),
             Row(
