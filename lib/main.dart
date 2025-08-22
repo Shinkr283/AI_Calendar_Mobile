@@ -4,7 +4,6 @@ import 'services/database_service.dart';
 import 'services/event_service.dart';
 import 'services/user_service.dart';
 import 'services/chat_service.dart';
-
 import 'models/event.dart';
 import 'models/user_profile.dart';
 import 'models/chat_message.dart';
@@ -21,6 +20,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
 import 'services/location_service.dart';
 import 'services/native_alarm_service.dart';
+import 'services/holiday_service.dart';
+import 'services/chat_prompt_service.dart';
 
 
 // 권한 요청 및 현재 위치 조회
@@ -46,6 +47,28 @@ void main() async {
   } catch (e) {
     print('초기 위치 확인 실패: $e');
   }
+
+  // 한국 공휴일 미리 로드 (올해)
+  try {
+    await HolidayService().preloadForYear(DateTime.now().year);
+  } catch (e) {
+    print('공휴일 로드 실패: $e');
+  }
+
+  // MBTI 기반 시스템 프롬프트를 앱 시작 시 미리 생성합니다
+  try {
+    final currentUser = await UserService().getCurrentUser();
+    final mbti = currentUser?.mbtiType ?? 'INFP';
+    PromptService().createSystemPrompt(mbti);
+  } catch (_) {}
+    runApp(MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ChatProvider()),
+        
+      ],
+      child: const AICalendarApp(),
+    ),
+  );
 }
 
 /// 알림 권한 요청 함수
@@ -247,8 +270,7 @@ class CalendarTabScreen extends StatelessWidget {
         startTime: DateTime.now().add(const Duration(hours: 1)),
         endTime: DateTime.now().add(const Duration(hours: 2)),
         location: '회의실 A',
-        category: EventCategory.work,
-        priority: EventPriority.high,
+        alarmMinutesBefore: 10,
       );
 
       // 생성된 일정 조회

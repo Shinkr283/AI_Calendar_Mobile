@@ -25,8 +25,6 @@ class _EventFormState extends State<EventForm> {
   late DateTime _endTime;
   String _location = '';
   PlaceDetails? _selectedPlace;
-  // late String _category;
-  // late int _priority;
   int _alarmMinutesBefore = 10; // 기본값 10분 전
   final List<int> _alarmOptions = [0, 5, 10, 15, 30, 60, 120];
 
@@ -40,8 +38,8 @@ class _EventFormState extends State<EventForm> {
     _endTime = e?.endTime ?? DateTime.now().add(const Duration(hours: 1));
     _location = e?.location ?? '';
     _alarmMinutesBefore = e?.alarmMinutesBefore ?? 10; // 기존 일정의 알림 시간 복원
-    
-    // 🗺️ 저장된 좌표가 있다면 PlaceDetails 생성
+
+     // 🗺️ 저장된 좌표가 있다면 PlaceDetails 생성
     if (e?.locationLatitude != null && e?.locationLongitude != null && e!.location.isNotEmpty) {
       _selectedPlace = PlaceDetails(
         placeId: '',
@@ -56,9 +54,6 @@ class _EventFormState extends State<EventForm> {
       // 좌표는 없지만 장소 이름이 있다면 검색해서 좌표 찾기
       _searchAndSetInitialPlace(e.location);
     }
-    // 카테고리/우선순위 임시 고정
-    // _category = e?.category ?? EventCategory.personal;
-    // _priority = e?.priority ?? EventPriority.medium;
     print('🔧 EventForm 초기화: 알림 시간 = $_alarmMinutesBefore분 전');
   }
 
@@ -128,7 +123,7 @@ class _EventFormState extends State<EventForm> {
       MaterialPageRoute(
         builder: (context) => LocationPicker(
           initialLocation: _location,
-          initialPlace: _selectedPlace, // 저장된 장소 정보 전달
+          initialPlace: _selectedPlace,
           onLocationSelected: (place) {
             setState(() {
               _selectedPlace = place;
@@ -157,16 +152,10 @@ class _EventFormState extends State<EventForm> {
         startTime: _startTime,
         endTime: _endTime,
         location: _location,
-        locationLatitude: _selectedPlace?.latitude, // 🗺️ 좌표 저장
-        locationLongitude: _selectedPlace?.longitude, // 🗺️ 좌표 저장
-        category: EventCategory.other,
-        priority: EventPriority.medium,
-        isAllDay: false,
-        recurrenceRule: null,
-        attendees: [],
-        color: '#2196F3',
+        locationLatitude: _selectedPlace?.latitude,
+        locationLongitude: _selectedPlace?.longitude,
         isCompleted: false,
-        alarmMinutesBefore: _alarmMinutesBefore, // 설정된 알림 시간 포함
+        alarmMinutesBefore: _alarmMinutesBefore,
         createdAt: widget.initialEvent?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
       );
@@ -294,4 +283,4 @@ class _EventFormState extends State<EventForm> {
       ),
     );
   }
-} 
+}

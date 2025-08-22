@@ -12,12 +12,7 @@ class Event {
   final String location;
   final double? locationLatitude; // 🗺️ 장소 위도
   final double? locationLongitude; // 🗺️ 장소 경도
-  final String category;
-  final int priority; // 1: 낮음, 2: 보통, 3: 높음
-  final bool isAllDay;
-  final String? recurrenceRule; // 반복 일정 규칙
-  final List<String> attendees; // 참석자 목록
-  final String color; // 일정 색상 (hex 코드)
+  final String? googleEventId; // Google Calendar Event ID (동기화용)
   final bool isCompleted;
   final int alarmMinutesBefore; // 알림 시간 (분 단위, 0이면 알림 없음)
   final DateTime createdAt;
@@ -32,12 +27,7 @@ class Event {
     required this.location,
     this.locationLatitude,
     this.locationLongitude,
-    required this.category,
-    required this.priority,
-    required this.isAllDay,
-    this.recurrenceRule,
-    required this.attendees,
-    required this.color,
+    this.googleEventId,
     required this.isCompleted,
     required this.alarmMinutesBefore,
     required this.createdAt,
@@ -59,12 +49,7 @@ class Event {
       'location': location,
       'locationLatitude': locationLatitude,
       'locationLongitude': locationLongitude,
-      'category': category,
-      'priority': priority,
-      'isAllDay': isAllDay ? 1 : 0,
-      'recurrenceRule': recurrenceRule,
-      'attendees': attendees.join(','), // 쉼표로 구분된 문자열로 저장
-      'color': color,
+      'googleEventId': googleEventId,
       'isCompleted': isCompleted ? 1 : 0,
       'alarmMinutesBefore': alarmMinutesBefore,
       'createdAt': createdAt.millisecondsSinceEpoch,
@@ -81,17 +66,8 @@ class Event {
       startTime: DateTime.fromMillisecondsSinceEpoch(map['startTime'] as int),
       endTime: DateTime.fromMillisecondsSinceEpoch(map['endTime'] as int),
       location: map['location'] as String,
-      locationLatitude: map['locationLatitude'] as double?,
-      locationLongitude: map['locationLongitude'] as double?,
-      category: map['category'] as String,
-      priority: map['priority'] as int,
-      isAllDay: (map['isAllDay'] as int) == 1,
-      recurrenceRule: map['recurrenceRule'] as String?,
-      attendees: map['attendees'] != null 
-          ? (map['attendees'] as String).split(',').where((e) => e.isNotEmpty).toList()
-          : [],
-      color: map['color'] as String,
       isCompleted: (map['isCompleted'] as int) == 1,
+      googleEventId: map['googleEventId'] as String?,
       alarmMinutesBefore: (map['alarmMinutesBefore'] as int?) ?? 10, // 기본값 10분
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] as int),
@@ -108,12 +84,7 @@ class Event {
     String? location,
     double? locationLatitude,
     double? locationLongitude,
-    String? category,
-    int? priority,
-    bool? isAllDay,
-    String? recurrenceRule,
-    List<String>? attendees,
-    String? color,
+    String? googleEventId,
     bool? isCompleted,
     int? alarmMinutesBefore,
     DateTime? createdAt,
@@ -128,12 +99,7 @@ class Event {
       location: location ?? this.location,
       locationLatitude: locationLatitude ?? this.locationLatitude,
       locationLongitude: locationLongitude ?? this.locationLongitude,
-      category: category ?? this.category,
-      priority: priority ?? this.priority,
-      isAllDay: isAllDay ?? this.isAllDay,
-      recurrenceRule: recurrenceRule ?? this.recurrenceRule,
-      attendees: attendees ?? this.attendees,
-      color: color ?? this.color,
+      googleEventId: googleEventId ?? this.googleEventId,
       isCompleted: isCompleted ?? this.isCompleted,
       alarmMinutesBefore: alarmMinutesBefore ?? this.alarmMinutesBefore,
       createdAt: createdAt ?? this.createdAt,
@@ -155,65 +121,3 @@ class Event {
   @override
   int get hashCode => id.hashCode;
 }
-
-// 일정 카테고리 상수
-class EventCategory {
-  static const String work = 'work';
-  static const String personal = 'personal';
-  static const String health = 'health';
-  static const String social = 'social';
-  static const String education = 'education';
-  static const String travel = 'travel';
-  static const String other = 'other';
-
-  static const List<String> all = [
-    work,
-    personal,
-    health,
-    social,
-    education,
-    travel,
-    other,
-  ];
-
-  static String getDisplayName(String category) {
-    switch (category) {
-      case work:
-        return '업무';
-      case personal:
-        return '개인';
-      case health:
-        return '건강';
-      case social:
-        return '사교';
-      case education:
-        return '교육';
-      case travel:
-        return '여행';
-      case other:
-        return '기타';
-      default:
-        return '기타';
-    }
-  }
-}
-
-// 일정 우선순위 상수
-class EventPriority {
-  static const int low = 1;
-  static const int medium = 2;
-  static const int high = 3;
-
-  static String getDisplayName(int priority) {
-    switch (priority) {
-      case low:
-        return '낮음';
-      case medium:
-        return '보통';
-      case high:
-        return '높음';
-      default:
-        return '보통';
-    }
-  }
-} 

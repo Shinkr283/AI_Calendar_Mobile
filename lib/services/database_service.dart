@@ -83,12 +83,7 @@ class DatabaseService {
           location TEXT,
           locationLatitude REAL,
           locationLongitude REAL,
-          category TEXT NOT NULL,
-          priority INTEGER NOT NULL DEFAULT 2,
-          isAllDay INTEGER NOT NULL DEFAULT 0,
-          recurrenceRule TEXT,
-          attendees TEXT,
-          color TEXT NOT NULL,
+          googleEventId TEXT,
           isCompleted INTEGER NOT NULL DEFAULT 0,
           alarmMinutesBefore INTEGER NOT NULL DEFAULT 10,
           createdAt INTEGER NOT NULL,
@@ -133,7 +128,6 @@ class DatabaseService {
       // 인덱스 생성
       print('📊 인덱스 생성 중...');
       await db.execute('CREATE INDEX idx_events_start_time ON events(startTime)');
-      await db.execute('CREATE INDEX idx_events_category ON events(category)');
       await db.execute('CREATE INDEX idx_chat_messages_session ON chat_messages(sessionId)');
       await db.execute('CREATE INDEX idx_chat_messages_timestamp ON chat_messages(timestamp)');
       print('✅ 모든 인덱스 생성 완료');
@@ -150,6 +144,8 @@ class DatabaseService {
     print('🔄 데이터베이스 업그레이드: $oldVersion → $newVersion');
     
     if (oldVersion < 2) {
+      // events 테이블에 googleEventId 컬럼 추가
+      await db.execute('ALTER TABLE events ADD COLUMN googleEventId TEXT');
       // 버전 2: alarmMinutesBefore 필드 추가
       print('📅 events 테이블에 alarmMinutesBefore 컬럼 추가 중...');
       await db.execute('ALTER TABLE events ADD COLUMN alarmMinutesBefore INTEGER NOT NULL DEFAULT 10');
@@ -319,19 +315,7 @@ class DatabaseService {
       whereClause += 'endTime <= ?';
       whereArgs.add(endDate.millisecondsSinceEpoch);
     }
-    
-    if (category != null) {
-      if (whereClause.isNotEmpty) whereClause += ' AND ';
-      whereClause += 'category = ?';
-      whereArgs.add(category);
-    }
-    
-    if (priority != null) {
-      if (whereClause.isNotEmpty) whereClause += ' AND ';
-      whereClause += 'priority = ?';
-      whereArgs.add(priority);
-    }
-    
+      
     if (isCompleted != null) {
       if (whereClause.isNotEmpty) whereClause += ' AND ';
       whereClause += 'isCompleted = ?';
@@ -348,14 +332,57 @@ class DatabaseService {
     return maps.map((map) => Event.fromMap(map)).toList();
   }
 
-  Future<List<Event>> getEventsForDate(DateTime date) async {
-    final startOfDay = DateTime(date.year, date.month, date.day);
-    final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
-    
-    return await getEvents(
-      startDate: startOfDay,
-      endDate: endOfDay,
+  Future<Event?> getEventByGoogleId(String googleEventId) async {
+    final db = await database;
+    final maps = await db.query(
+      'events',
+      where: 'googleEventId = ?',
+      whereArgs: [googleEventId],
+      limit: 1,
     );
+    if (maps.isNotEmpty) {
+      return Event.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  Future<List<Event>> getEventsForDate(DateTime date) async {
+    // final startOfDay = DateTime(date.year, date.month, date.day);
+    // final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
+    
+    // return await getEvents(
+    //   startDate: startOfDay,
+    //   endDate: endOfDay,
+  
+    // 하루와 "겹치는" 모든 일정 반환: (endTime >= startOfDay) AND (startTime <= endOfDay)
+    final db = await database;
+    final startOfDay = DateTime(date.year, date.month, date.day).millisecondsSinceEpoch;
+    final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59).millisecondsSinceEpoch;
+
+    final maps = await db.query(
+      'events',
+      where: 'endTime >= ? AND startTime <= ?',
+      whereArgs: [startOfDay, endOfDay],
+      orderBy: 'startTime ASC',
+    );
+
+    return maps.map((map) => Event.fromMap(map)).toList();
+  }
+
+  Future<int> getLatestEventUpdatedAtForDate(DateTime date) async {
+    final db = await database;
+    final startOfDay = DateTime(date.year, date.month, date.day).millisecondsSinceEpoch;
+    final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59).millisecondsSinceEpoch;
+    final result = await db.rawQuery(
+      'SELECT MAX(updatedAt) as maxUpdated FROM events WHERE endTime >= ? AND startTime <= ?',
+      [startOfDay, endOfDay],
+    );
+    if (result.isNotEmpty) {
+      final value = result.first['maxUpdated'];
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+    }
+    return 0;
   }
 
   Future<int> updateEvent(Event event) async {

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../services/google_calendar_service.dart';
-import '../models/event.dart';
 import '../services/event_service.dart';
 import '../main.dart';
 
@@ -10,12 +9,14 @@ class CalendarSyncPromptScreen extends StatelessWidget {
   final VoidCallback? onSkip;
 
   const CalendarSyncPromptScreen({
-    Key? key,
+    super.key,
     this.onSyncComplete,
     this.onSkip,
-  }) : super(key: key);
+  });
 
   Future<void> _onSync(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
     try {
       // 1. 구글 로그인 계정 accessToken 획득
       final googleUser = await GoogleSignIn().signIn();
@@ -23,7 +24,7 @@ class CalendarSyncPromptScreen extends StatelessWidget {
       final accessToken = googleAuth?.accessToken;
 
       if (accessToken == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           const SnackBar(content: Text('구글 인증에 실패했습니다.')),
         );
         return;
@@ -43,28 +44,20 @@ class CalendarSyncPromptScreen extends StatelessWidget {
           startTime: gEvent.start!.dateTime!.toLocal(),
           endTime: gEvent.end!.dateTime!.toLocal(),
           location: gEvent.location ?? '',
-          category: EventCategory.personal, // 기본값, 필요시 매핑
-          priority: EventPriority.medium, // 기본값, 필요시 매핑
-          isAllDay: gEvent.start!.date != null,
-          recurrenceRule: (gEvent.recurrence != null && gEvent.recurrence!.isNotEmpty)
-              ? gEvent.recurrence!.first
-              : null,
-          attendees: gEvent.attendees?.map((a) => a.email ?? '').where((e) => e.isNotEmpty).toList() ?? [],
-          color: '#2196F3', // 기본값, 필요시 매핑
+          alarmMinutesBefore: 10,
         );
         successCount++;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: Text('구글 캘린더에서 $successCount개의 일정을 동기화했습니다.')),
       );
       if (onSyncComplete != null) onSyncComplete!();
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const MainScreen()),
+      navigator.pushReplacement(
+        MaterialPageRoute(builder: (_) => const MainScreen()),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: Text('동기화 중 오류 발생: $e')),
       );
     }

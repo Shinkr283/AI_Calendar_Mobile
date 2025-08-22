@@ -5,7 +5,8 @@ import '../models/event.dart';
 import '../widgets/event_form.dart';
 import 'calendar_sync_prompt_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import '../services/calendar_sync_service.dart';
+import '../services/holiday_service.dart';
 import '../services/native_alarm_service.dart';
 import '../utils/database_test_utils.dart';
 
@@ -20,6 +21,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   List<Event> _events = [];
+  Map<String, String> _holidays = {};
   bool _isLoading = false;
 
   @override
@@ -58,6 +60,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Future<void> _loadEventsForMonth(DateTime month) async {
     setState(() => _isLoading = true);
     final events = await EventService().getEventsForMonth(month);
+    final holidays = await HolidayService().getHolidaysForYear(month.year);
+    final eventsFuture = EventService().getEventsForMonth(month);
     setState(() {
       _events = events;
       _isLoading = false;
@@ -67,6 +71,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   void _onDaySelected(DateTime selectedDay, DateTime focusedDay) {
     setState(() {
       _selectedDay = selectedDay;
+      // _holidays = holidays;
       _focusedDay = focusedDay;
     });
     // 날짜를 선택해도 월 전체 일정을 유지
@@ -105,12 +110,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
           startTime: newEvent.startTime,
           endTime: newEvent.endTime,
           location: newEvent.location,
-          category: newEvent.category,
-          priority: newEvent.priority,
-          isAllDay: newEvent.isAllDay,
-          recurrenceRule: newEvent.recurrenceRule,
-          attendees: newEvent.attendees,
-          color: newEvent.color,
           alarmMinutesBefore: newEvent.alarmMinutesBefore, // 알림 시간 전달
         );
         
@@ -275,6 +274,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
       _loadEventsForMonth(_focusedDay);
     }
   }
+  String _fmtDate(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   @override
   Widget build(BuildContext context) {
@@ -616,8 +617,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 ),
               ),
             ],
+          ), // PopupMenuButton 끝
+          IconButton(
+            icon: const Icon(Icons.sync),
+            tooltip: '구글 캘린더 동기화',
+            onPressed: _onSyncWithGoogle,
           ),
-        ],
+        ], // actions 리스트 종료
       ),
       body: Column(
         children: [
@@ -663,6 +669,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             ),
                             maxLines: 1,
                             textAlign: TextAlign.center,
+                          ),
+                        ),
+                      if (_holidays.containsKey(_fmtDate(day)))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            _holidays[_fmtDate(day)]!,
+                            style: const TextStyle(fontSize: 10, color: Colors.red),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                     ],
@@ -769,7 +785,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               },
               markerBuilder: (context, day, events) {
                 final monthEvents = _events
-                    .where((e) => !e.isAllDay && !e.isCompleted && (e.startTime.month == day.month || e.endTime.month == day.month))
+                    .where((e) => !e.isCompleted && (e.startTime.month == day.month || e.endTime.month == day.month))
                     .toList();
                 monthEvents.sort((a, b) => a.startTime.compareTo(b.startTime));
                 final Map<String, int> eventLineMap = {};
@@ -879,7 +895,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                   ),
                                 ],
                               ),
-                              trailing: Text(EventCategory.getDisplayName(event.category)),
+                              trailing: Text(event.alarmMinutesBefore.toString()),
                               onTap: () {
                                 _onEditEvent(event);
                               },
@@ -896,5 +912,23 @@ class _CalendarScreenState extends State<CalendarScreen> {
         tooltip: '일정 추가',
       ),
     );
+  }
+  Future<void> _onSyncWithGoogle() async {
+    setState(() => _isLoading = true);
+    try {
+      final inserted = await CalendarSyncService().syncCurrentMonth(readonly: false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('동기화 완료: ${inserted}건')),
+      );
+      await _loadEventsForMonth(_focusedDay);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('동기화 실패: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 } 

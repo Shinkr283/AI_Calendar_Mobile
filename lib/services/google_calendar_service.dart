@@ -1,6 +1,7 @@
 import 'package:googleapis/calendar/v3.dart' as calendar;
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
+import '../models/event.dart' as local;
 
 class GoogleCalendarService {
   final String accessToken;
@@ -22,6 +23,7 @@ class GoogleCalendarService {
     bool singleEvents = true,
     String orderBy = 'startTime',
     String? timeZone,
+    bool showDeleted = true,
   }) async {
     final client = GoogleHttpClient(accessToken);
     final api = calendar.CalendarApi(client);
@@ -33,8 +35,49 @@ class GoogleCalendarService {
       orderBy: orderBy,
       timeZone: timeZone,
       maxResults: 2500,
+      showDeleted: showDeleted,
     );
     return res.items ?? [];
+  }
+
+  // ===== Local <-> Google 변환 및 쓰기 API =====
+  calendar.EventDateTime _toEventDateTime(DateTime dt) {
+    return calendar.EventDateTime()
+      ..dateTime = dt.toUtc()
+      ..timeZone = 'Asia/Seoul';
+  }
+
+  // all-day 변환은 현재 사용하지 않음
+
+  calendar.Event _fromLocalEvent(local.Event e) {
+    final ev = calendar.Event()
+      ..summary = e.title
+      ..description = e.description
+      ..location = e.location;
+
+    ev.start = _toEventDateTime(e.startTime);
+    ev.end = _toEventDateTime(e.endTime);
+    return ev;
+  }
+
+  Future<calendar.Event> createEventFromLocal(local.Event e) async {
+    final client = GoogleHttpClient(accessToken);
+    final api = calendar.CalendarApi(client);
+    final ev = _fromLocalEvent(e);
+    return await api.events.insert(ev, 'primary');
+  }
+
+  Future<calendar.Event> updateEventFromLocal(String eventId, local.Event e) async {
+    final client = GoogleHttpClient(accessToken);
+    final api = calendar.CalendarApi(client);
+    final ev = _fromLocalEvent(e);
+    return await api.events.update(ev, 'primary', eventId);
+  }
+
+  Future<void> deleteEventById(String eventId) async {
+    final client = GoogleHttpClient(accessToken);
+    final api = calendar.CalendarApi(client);
+    await api.events.delete('primary', eventId);
   }
 }
 

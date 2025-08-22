@@ -37,8 +37,7 @@ class DatabaseTestUtils {
         startTime: DateTime.now().add(const Duration(hours: 1)),
         endTime: DateTime.now().add(const Duration(hours: 2)),
         location: '테스트 장소',
-        category: EventCategory.other,
-        priority: EventPriority.medium,
+        alarmMinutesBefore: 10,
       );
       print('✅ 테스트 이벤트 생성 성공: ${testEvent.id}');
       

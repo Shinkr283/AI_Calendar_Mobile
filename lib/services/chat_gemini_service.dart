@@ -56,7 +56,7 @@ class GeminiService {
         'temperature': 0.7,
         'topK': 1,
         'topP': 1,
-        'maxOutputTokens': 1000,
+        'maxOutputTokens': 2048, // increased token limit to prevent truncation
       }
     };
 
@@ -134,7 +134,7 @@ class GeminiService {
         'temperature': 0.7,
         'topK': 1,
         'topP': 1,
-        'maxOutputTokens': 1000,
+        'maxOutputTokens': 2048, // increased token limit
       }
     };
 

@@ -3,7 +3,11 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({Key? key}) : super(key: key);
+  /// 보여줄 초기 위치 좌표 (위치가 없으면 기기 현재 위치 사용)
+  final double? initialLat;
+  final double? initialLon;
+  final String? initialAddress;
+  const MapScreen({Key? key, this.initialLat, this.initialLon, this.initialAddress}) : super(key: key);
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -12,11 +16,17 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   GoogleMapController? _mapController;
   LatLng? _currentLatLng;
+  String _address = '';
 
   @override
   void initState() {
     super.initState();
-    _getCurrentLocation();
+    if (widget.initialLat != null && widget.initialLon != null) {
+      _currentLatLng = LatLng(widget.initialLat!, widget.initialLon!);
+      _address = widget.initialAddress ?? '';
+    } else {
+      _getCurrentLocation();
+    }
   }
 
   Future<void> _getCurrentLocation() async {
@@ -25,6 +35,7 @@ class _MapScreenState extends State<MapScreen> {
         desiredAccuracy: LocationAccuracy.high);
     setState(() {
       _currentLatLng = LatLng(position.latitude, position.longitude);
+      _address = ''; // 기기 위치 사용시 주소는 따로 설정되지 않음
     });
     _mapController?.animateCamera(
       CameraUpdate.newLatLng(_currentLatLng!),
@@ -34,7 +45,7 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('내 위치 지도')),
+      appBar: AppBar(title: const Text('위치 지도')),
       body: _currentLatLng == null
           ? const Center(child: CircularProgressIndicator())
           : GoogleMap(
@@ -49,7 +60,7 @@ class _MapScreenState extends State<MapScreen> {
                 Marker(
                   markerId: const MarkerId('me'),
                   position: _currentLatLng!,
-                  infoWindow: const InfoWindow(title: '내 위치'),
+                  infoWindow: InfoWindow(title: _address.isNotEmpty ? _address : '위치'),
                 ),
               },
             ),

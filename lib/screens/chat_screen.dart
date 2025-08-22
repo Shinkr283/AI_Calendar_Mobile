@@ -3,6 +3,10 @@ import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 import 'package:provider/provider.dart';
 import '../services/chat_service.dart'; // ChatProvider를 import
+import '../services/chat_location_weather_service.dart';
+import '../services/places_service.dart';
+import 'map_screen.dart';
+import '../services/briefing_service.dart';
 
 class ChatScreen extends StatelessWidget {
   const ChatScreen({super.key});
@@ -19,12 +23,73 @@ class ChatScreen extends StatelessWidget {
         builder: (context, provider, child) {
           // 로딩 중이고, 메시지가 비어있을 때 로딩 인디케이터를 표시
           if (provider.isLoading && provider.messages.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 8),
+                  Text(
+                    '잠시만 기다려주세요. 브리핑을 준비 중입니다.',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                ],
+              ),
+            );
           }
           
           return Chat(
             messages: provider.messages,
-            onSendPressed: provider.sendMessage,
+            onSendPressed: (partial) async {
+              final text = partial.text.trim();
+              // 날짜별 브리핑 요청: 'YYYY-MM-DD 브리핑'
+              final dateBrf = RegExp(r"^(\d{4})[-.](\d{1,2})[-.](\d{1,2})\s*브리핑").firstMatch(text);
+              if (dateBrf != null) {
+                final y = int.parse(dateBrf.group(1)!);
+                final m = int.parse(dateBrf.group(2)!);
+                final d = int.parse(dateBrf.group(3)!);
+                final date = DateTime(y, m, d);
+                final briefing = await BriefingService().getBriefingForDate(date);
+                provider.addAssistantText(briefing);
+                return;
+              }
+              // 오늘 브리핑 요청: '브리핑'
+              if (text == '브리핑') {
+                await provider.requestBriefing();
+                return;
+              }
+              // '<장소> 날씨' 요청: 챗으로 날씨 정보 응답
+              final weatherMatch = RegExp(r'(.+?)\s*날씨').firstMatch(text);
+              if (weatherMatch != null) {
+                final location = weatherMatch.group(1)!.trim();
+                final resultText = await LocationWeatherService().getWeatherForLocation(location);
+                provider.addAssistantText(resultText);
+                return;
+              }
+              // '<장소> 위치' 요청: 지도 화면으로 이동
+              final locMatch = RegExp(r'(.+?)\s*(위치|장소)').firstMatch(text);
+              if (locMatch != null) {
+                final location = locMatch.group(1)!.trim();
+                final place = await PlacesService.geocodeAddress(location);
+                if (place != null) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (ctx) => MapScreen(
+                        initialLat: place.latitude,
+                        initialLon: place.longitude,
+                        initialAddress: place.address,
+                      ),
+                    ),
+                  );
+                  return;
+                } else {
+                  provider.addAssistantText('죄송합니다. "$location" 위치를 찾을 수 없습니다.');
+                  return;
+                }
+              }
+              // 그 외 일반 메시지
+              await provider.sendMessage(partial);
+            },
             user: user,
             theme: const DefaultChatTheme(
               primaryColor: Colors.blue,
