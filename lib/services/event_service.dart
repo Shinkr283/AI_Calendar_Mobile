@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import '../models/event.dart';
 import 'database_service.dart';
+import 'native_alarm_service.dart';
 
 class EventService {
   static final EventService _instance = EventService._internal();
@@ -24,27 +25,52 @@ class EventService {
     String? recurrenceRule,
     List<String> attendees = const [],
     String? color,
+    int alarmMinutesBefore = 10,
   }) async {
-    final event = Event(
-      id: _generateEventId(),
-      title: title,
-      description: description,
-      startTime: startTime,
-      endTime: endTime,
-      location: location ?? '',
-      category: category,
-      priority: priority,
-      isAllDay: isAllDay,
-      recurrenceRule: recurrenceRule,
-      attendees: attendees,
-      color: color ?? _getDefaultColorForCategory(category),
-      isCompleted: false,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
+    try {
+      print('🏗️ EventService: 이벤트 생성 시작');
+      print('📝 제목: $title');
+      print('📅 시작 시간: $startTime');
+      print('📅 종료 시간: $endTime');
+      
+      // 입력값 검증
+      if (title.trim().isEmpty) {
+        throw ArgumentError('제목은 필수입니다.');
+      }
+      
+      if (startTime.isAfter(endTime)) {
+        throw ArgumentError('시작 시간이 종료 시간보다 늦을 수 없습니다.');
+      }
+      
+      final event = Event(
+        id: _generateEventId(),
+        title: title.trim(),
+        description: description.trim(),
+        startTime: startTime,
+        endTime: endTime,
+        location: location?.trim() ?? '',
+        category: category,
+        priority: priority,
+        isAllDay: isAllDay,
+        recurrenceRule: recurrenceRule,
+        attendees: attendees,
+        color: color ?? _getDefaultColorForCategory(category),
+        isCompleted: false,
+        alarmMinutesBefore: alarmMinutesBefore,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
 
-    await _databaseService.insertEvent(event);
-    return event;
+      print('💾 데이터베이스에 저장 시도: ${event.id}');
+      final insertResult = await _databaseService.insertEvent(event);
+      print('✅ 데이터베이스 저장 성공: insertResult = $insertResult');
+      
+      return event;
+    } catch (e, stackTrace) {
+      print('❌ EventService.createEvent 실패: $e');
+      print('📍 스택 트레이스: $stackTrace');
+      rethrow;
+    }
   }
 
   // 일정 조회

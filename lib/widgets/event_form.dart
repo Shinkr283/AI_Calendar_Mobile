@@ -39,9 +39,11 @@ class _EventFormState extends State<EventForm> {
     _startTime = e?.startTime ?? DateTime.now();
     _endTime = e?.endTime ?? DateTime.now().add(const Duration(hours: 1));
     _location = e?.location ?? '';
+    _alarmMinutesBefore = e?.alarmMinutesBefore ?? 10; // 기존 일정의 알림 시간 복원
     // 카테고리/우선순위 임시 고정
     // _category = e?.category ?? EventCategory.personal;
     // _priority = e?.priority ?? EventPriority.medium;
+    print('🔧 EventForm 초기화: 알림 시간 = $_alarmMinutesBefore분 전');
   }
 
   Future<void> _pickDateTime({required bool isStart}) async {
@@ -113,9 +115,11 @@ class _EventFormState extends State<EventForm> {
         attendees: [],
         color: '#2196F3',
         isCompleted: false,
+        alarmMinutesBefore: _alarmMinutesBefore, // 설정된 알림 시간 포함
         createdAt: widget.initialEvent?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
       );
+      print('📝 Event 생성: 알림 시간 = ${event.alarmMinutesBefore}분 전');
       widget.onSave(event, _alarmMinutesBefore);
     }
   }

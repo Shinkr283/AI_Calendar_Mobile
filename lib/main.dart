@@ -4,7 +4,7 @@ import 'services/database_service.dart';
 import 'services/event_service.dart';
 import 'services/user_service.dart';
 import 'services/chat_service.dart';
-import 'services/notification_service.dart';
+
 import 'models/event.dart';
 import 'models/user_profile.dart';
 import 'models/chat_message.dart';
@@ -20,21 +20,16 @@ import 'package:intl/date_symbol_data_local.dart';//추가
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
 import 'services/location_service.dart';
-import 'package:timezone/data/latest.dart' as tz;
-import 'package:timezone/timezone.dart' as tz;
+import 'services/native_alarm_service.dart';
+
 
 // 권한 요청 및 현재 위치 조회
 // 위치 권한 및 현재 위치는 LocationService에서 처리합니다.
 
-class KstTime {
-  static tz.TZDateTime now() => tz.TZDateTime.now(tz.local);
-  static tz.TZDateTime from(DateTime dt) => tz.TZDateTime.from(dt.toUtc(), tz.local);
-}
+// KstTime 클래스 제거됨 (네이티브 알림 사용으로 더 이상 필요없음)
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  tz.initializeTimeZones();
-  tz.setLocalLocation(tz.getLocation('Asia/Seoul'));
   // .env 파일 로드
   await dotenv.load(fileName: ".env");
   // Firebase 초기화
@@ -42,16 +37,49 @@ void main() async {
   // 한국어 날짜 포맷 초기화
   await initializeDateFormatting('ko_KR', null);
 
-  await NotificationService().init();
-  if (await Permission.notification.isDenied) {
-    await Permission.notification.request();
-  }
+  // 알림 권한 요청
+  await _requestNotificationPermission();
 
   try {
     final pos = await LocationService().getCurrentPosition(accuracy: LocationAccuracy.high);
     print('초기 위치: ${pos.latitude}, ${pos.longitude}');
   } catch (e) {
     print('초기 위치 확인 실패: $e');
+  }
+}
+
+/// 알림 권한 요청 함수
+Future<void> _requestNotificationPermission() async {
+  try {
+    // 안드로이드 알림 권한 확인
+    PermissionStatus permission = await Permission.notification.status;
+    
+    print('📱 현재 알림 권한 상태: $permission');
+    
+    if (permission.isDenied) {
+      print('🔔 알림 권한을 요청합니다...');
+      
+      // 알림 권한 요청
+      PermissionStatus result = await Permission.notification.request();
+      
+      if (result.isGranted) {
+        print('✅ 알림 권한이 허용되었습니다!');
+      } else if (result.isDenied) {
+        print('❌ 알림 권한이 거부되었습니다.');
+        print('💡 설정에서 수동으로 허용해주세요: 설정 > 앱 > ai_calendar_mobile > 알림');
+      } else if (result.isPermanentlyDenied) {
+        print('🚫 알림 권한이 영구적으로 거부되었습니다.');
+        print('💡 설정에서 수동으로 허용해주세요: 설정 > 앱 > ai_calendar_mobile > 알림');
+      }
+    } else if (permission.isGranted) {
+      print('✅ 알림 권한이 이미 허용되어 있습니다!');
+    } else if (permission.isPermanentlyDenied) {
+      print('🚫 알림 권한이 영구적으로 거부되어 있습니다.');
+      print('💡 설정에서 수동으로 허용해주세요: 설정 > 앱 > ai_calendar_mobile > 알림');
+    }
+    
+  } catch (e) {
+    print('❌ 알림 권한 확인 중 오류: $e');
   }
 
   runApp(MultiProvider(

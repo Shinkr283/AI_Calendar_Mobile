@@ -96,9 +96,7 @@ dependencies:
   googleapis_auth: ^1.4.0
   # google_generative_ai: ^0.4.7
 
-  # === 알림 ===
-  flutter_local_notifications: ^19.3.0
-  timezone: ^0.10.1
+  # === 네이티브 알림 사용 (flutter_local_notifications 제거됨) ===
 
 dev_dependencies:
   flutter_test:

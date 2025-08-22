@@ -22,6 +22,7 @@ Event _$EventFromJson(Map<String, dynamic> json) => Event(
       .toList(),
   color: json['color'] as String,
   isCompleted: json['isCompleted'] as bool,
+  alarmMinutesBefore: (json['alarmMinutesBefore'] as num).toInt(),
   createdAt: DateTime.parse(json['createdAt'] as String),
   updatedAt: DateTime.parse(json['updatedAt'] as String),
 );
@@ -40,6 +41,7 @@ Map<String, dynamic> _$EventToJson(Event instance) => <String, dynamic>{
   'attendees': instance.attendees,
   'color': instance.color,
   'isCompleted': instance.isCompleted,
+  'alarmMinutesBefore': instance.alarmMinutesBefore,
   'createdAt': instance.createdAt.toIso8601String(),
   'updatedAt': instance.updatedAt.toIso8601String(),
 };

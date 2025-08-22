@@ -20,95 +20,139 @@ class DatabaseService {
   }
 
   Future<Database> _initDatabase() async {
-    final databasesPath = await getDatabasesPath();
-    final path = join(databasesPath, 'ai_calendar.db');
+    try {
+      print('🔧 DatabaseService: 데이터베이스 초기화 시작');
+      
+      final databasesPath = await getDatabasesPath();
+      final path = join(databasesPath, 'ai_calendar.db');
+      print('📁 데이터베이스 경로: $path');
 
-    return await openDatabase(
-      path,
-      version: 1,
-      onCreate: _createDatabase,
-      onUpgrade: _upgradeDatabase,
-    );
+      final db = await openDatabase(
+        path,
+        version: 2, // 버전 업그레이드: 알림 시간 필드 추가
+        onCreate: _createDatabase,
+        onUpgrade: _upgradeDatabase,
+      );
+      
+      print('✅ 데이터베이스 초기화 완료');
+      
+      // 테이블 존재 확인
+      final tables = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
+      print('📋 존재하는 테이블들: ${tables.map((t) => t['name']).toList()}');
+      
+      return db;
+    } catch (e, stackTrace) {
+      print('❌ 데이터베이스 초기화 실패: $e');
+      print('📍 스택 트레이스: $stackTrace');
+      rethrow;
+    }
   }
 
   Future<void> _createDatabase(Database db, int version) async {
-    // 사용자 프로필 테이블
-    await db.execute('''
-      CREATE TABLE user_profiles (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        email TEXT NOT NULL UNIQUE,
-        profileImageUrl TEXT,
-        phoneNumber TEXT,
-        mbtiType TEXT,
-        preferences TEXT,
-        timezone TEXT NOT NULL,
-        language TEXT NOT NULL,
-        createdAt INTEGER NOT NULL,
-        updatedAt INTEGER NOT NULL
-      )
-    ''');
+    try {
+      print('🏗️ 데이터베이스 테이블 생성 시작');
+      
+      // 사용자 프로필 테이블
+      print('👤 user_profiles 테이블 생성 중...');
+      await db.execute('''
+        CREATE TABLE user_profiles (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          email TEXT NOT NULL UNIQUE,
+          profileImageUrl TEXT,
+          phoneNumber TEXT,
+          mbtiType TEXT,
+          preferences TEXT,
+          timezone TEXT NOT NULL,
+          language TEXT NOT NULL,
+          createdAt INTEGER NOT NULL,
+          updatedAt INTEGER NOT NULL
+        )
+      ''');
+      print('✅ user_profiles 테이블 생성 완료');
 
-    // 일정 테이블
-    await db.execute('''
-      CREATE TABLE events (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        description TEXT,
-        startTime INTEGER NOT NULL,
-        endTime INTEGER NOT NULL,
-        location TEXT,
-        category TEXT NOT NULL,
-        priority INTEGER NOT NULL DEFAULT 2,
-        isAllDay INTEGER NOT NULL DEFAULT 0,
-        recurrenceRule TEXT,
-        attendees TEXT,
-        color TEXT NOT NULL,
-        isCompleted INTEGER NOT NULL DEFAULT 0,
-        createdAt INTEGER NOT NULL,
-        updatedAt INTEGER NOT NULL
-      )
-    ''');
+      // 일정 테이블
+      print('📅 events 테이블 생성 중...');
+      await db.execute('''
+        CREATE TABLE events (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          description TEXT,
+          startTime INTEGER NOT NULL,
+          endTime INTEGER NOT NULL,
+          location TEXT,
+          category TEXT NOT NULL,
+          priority INTEGER NOT NULL DEFAULT 2,
+          isAllDay INTEGER NOT NULL DEFAULT 0,
+          recurrenceRule TEXT,
+          attendees TEXT,
+          color TEXT NOT NULL,
+          isCompleted INTEGER NOT NULL DEFAULT 0,
+          alarmMinutesBefore INTEGER NOT NULL DEFAULT 10,
+          createdAt INTEGER NOT NULL,
+          updatedAt INTEGER NOT NULL
+        )
+      ''');
+      print('✅ events 테이블 생성 완료');
 
-    // 채팅 세션 테이블
-    await db.execute('''
-      CREATE TABLE chat_sessions (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        createdAt INTEGER NOT NULL,
-        lastMessageAt INTEGER NOT NULL,
-        messageCount INTEGER NOT NULL DEFAULT 0,
-        isActive INTEGER NOT NULL DEFAULT 1
-      )
-    ''');
+      // 채팅 세션 테이블
+      print('💬 chat_sessions 테이블 생성 중...');
+      await db.execute('''
+        CREATE TABLE chat_sessions (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          createdAt INTEGER NOT NULL,
+          lastMessageAt INTEGER NOT NULL,
+          messageCount INTEGER NOT NULL DEFAULT 0,
+          isActive INTEGER NOT NULL DEFAULT 1
+        )
+      ''');
+      print('✅ chat_sessions 테이블 생성 완료');
 
-    // 채팅 메시지 테이블
-    await db.execute('''
-      CREATE TABLE chat_messages (
-        id TEXT PRIMARY KEY,
-        sessionId TEXT NOT NULL,
-        content TEXT NOT NULL,
-        type TEXT NOT NULL,
-        sender TEXT NOT NULL,
-        timestamp INTEGER NOT NULL,
-        metadata TEXT,
-        parentMessageId TEXT,
-        attachments TEXT,
-        status TEXT NOT NULL,
-        FOREIGN KEY (sessionId) REFERENCES chat_sessions (id) ON DELETE CASCADE
-      )
-    ''');
+      // 채팅 메시지 테이블
+      print('📝 chat_messages 테이블 생성 중...');
+      await db.execute('''
+        CREATE TABLE chat_messages (
+          id TEXT PRIMARY KEY,
+          sessionId TEXT NOT NULL,
+          content TEXT NOT NULL,
+          type TEXT NOT NULL,
+          sender TEXT NOT NULL,
+          timestamp INTEGER NOT NULL,
+          metadata TEXT,
+          parentMessageId TEXT,
+          attachments TEXT,
+          status TEXT NOT NULL,
+          FOREIGN KEY (sessionId) REFERENCES chat_sessions (id) ON DELETE CASCADE
+        )
+      ''');
+      print('✅ chat_messages 테이블 생성 완료');
 
-    // 인덱스 생성
-    await db.execute('CREATE INDEX idx_events_start_time ON events(startTime)');
-    await db.execute('CREATE INDEX idx_events_category ON events(category)');
-    await db.execute('CREATE INDEX idx_chat_messages_session ON chat_messages(sessionId)');
-    await db.execute('CREATE INDEX idx_chat_messages_timestamp ON chat_messages(timestamp)');
+      // 인덱스 생성
+      print('📊 인덱스 생성 중...');
+      await db.execute('CREATE INDEX idx_events_start_time ON events(startTime)');
+      await db.execute('CREATE INDEX idx_events_category ON events(category)');
+      await db.execute('CREATE INDEX idx_chat_messages_session ON chat_messages(sessionId)');
+      await db.execute('CREATE INDEX idx_chat_messages_timestamp ON chat_messages(timestamp)');
+      print('✅ 모든 인덱스 생성 완료');
+      
+      print('🎉 데이터베이스 테이블 생성 모두 완료!');
+    } catch (e, stackTrace) {
+      print('❌ 테이블 생성 실패: $e');
+      print('📍 스택 트레이스: $stackTrace');
+      rethrow;
+    }
   }
 
   Future<void> _upgradeDatabase(Database db, int oldVersion, int newVersion) async {
-    // 데이터베이스 스키마 업그레이드 로직
-    // 향후 버전 업데이트 시 사용
+    print('🔄 데이터베이스 업그레이드: $oldVersion → $newVersion');
+    
+    if (oldVersion < 2) {
+      // 버전 2: alarmMinutesBefore 필드 추가
+      print('📅 events 테이블에 alarmMinutesBefore 컬럼 추가 중...');
+      await db.execute('ALTER TABLE events ADD COLUMN alarmMinutesBefore INTEGER NOT NULL DEFAULT 10');
+      print('✅ alarmMinutesBefore 컬럼 추가 완료');
+    }
   }
 
   // 데이터베이스 닫기
@@ -197,8 +241,36 @@ class DatabaseService {
 
   // 일정 CRUD
   Future<int> insertEvent(Event event) async {
-    final db = await database;
-    return await db.insert('events', event.toMap());
+    try {
+      print('🗄️ DatabaseService: 이벤트 삽입 시작');
+      print('📋 이벤트 데이터: ${event.toMap()}');
+      
+      final db = await database;
+      print('✅ 데이터베이스 연결 성공');
+      
+      final result = await db.insert('events', event.toMap());
+      print('💾 이벤트 삽입 성공: result = $result');
+      
+      // 삽입 후 검증
+      final inserted = await db.query('events', where: 'id = ?', whereArgs: [event.id]);
+      print('🔍 삽입된 데이터 검증: ${inserted.length}개 발견');
+      
+      return result;
+    } catch (e, stackTrace) {
+      print('❌ DatabaseService.insertEvent 실패: $e');
+      print('📍 스택 트레이스: $stackTrace');
+      
+      // 데이터베이스 테이블 상태 확인
+      try {
+        final db = await database;
+        final tableInfo = await db.rawQuery("PRAGMA table_info(events)");
+        print('📊 events 테이블 구조: $tableInfo');
+      } catch (tableError) {
+        print('⚠️ 테이블 정보 조회 실패: $tableError');
+      }
+      
+      rethrow;
+    }
   }
 
   Future<Event?> getEvent(String id) async {

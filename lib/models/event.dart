@@ -17,6 +17,7 @@ class Event {
   final List<String> attendees; // 참석자 목록
   final String color; // 일정 색상 (hex 코드)
   final bool isCompleted;
+  final int alarmMinutesBefore; // 알림 시간 (분 단위, 0이면 알림 없음)
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -34,6 +35,7 @@ class Event {
     required this.attendees,
     required this.color,
     required this.isCompleted,
+    required this.alarmMinutesBefore,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -58,6 +60,7 @@ class Event {
       'attendees': attendees.join(','), // 쉼표로 구분된 문자열로 저장
       'color': color,
       'isCompleted': isCompleted ? 1 : 0,
+      'alarmMinutesBefore': alarmMinutesBefore,
       'createdAt': createdAt.millisecondsSinceEpoch,
       'updatedAt': updatedAt.millisecondsSinceEpoch,
     };
@@ -81,6 +84,7 @@ class Event {
           : [],
       color: map['color'] as String,
       isCompleted: (map['isCompleted'] as int) == 1,
+      alarmMinutesBefore: (map['alarmMinutesBefore'] as int?) ?? 10, // 기본값 10분
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] as int),
     );
@@ -101,6 +105,7 @@ class Event {
     List<String>? attendees,
     String? color,
     bool? isCompleted,
+    int? alarmMinutesBefore,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -118,6 +123,7 @@ class Event {
       attendees: attendees ?? this.attendees,
       color: color ?? this.color,
       isCompleted: isCompleted ?? this.isCompleted,
+      alarmMinutesBefore: alarmMinutesBefore ?? this.alarmMinutesBefore,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
