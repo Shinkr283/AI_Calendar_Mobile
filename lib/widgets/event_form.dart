@@ -40,10 +40,58 @@ class _EventFormState extends State<EventForm> {
     _endTime = e?.endTime ?? DateTime.now().add(const Duration(hours: 1));
     _location = e?.location ?? '';
     _alarmMinutesBefore = e?.alarmMinutesBefore ?? 10; // 기존 일정의 알림 시간 복원
+    
+    // 🗺️ 저장된 좌표가 있다면 PlaceDetails 생성
+    if (e?.locationLatitude != null && e?.locationLongitude != null && e!.location.isNotEmpty) {
+      _selectedPlace = PlaceDetails(
+        placeId: '',
+        name: e.location,
+        address: e.location,
+        latitude: e.locationLatitude!,
+        longitude: e.locationLongitude!,
+        types: [],
+      );
+      print('📍 저장된 장소 복원: ${e.location} (${e.locationLatitude}, ${e.locationLongitude})');
+    } else if (e?.location != null && e!.location.isNotEmpty) {
+      // 좌표는 없지만 장소 이름이 있다면 검색해서 좌표 찾기
+      _searchAndSetInitialPlace(e.location);
+    }
     // 카테고리/우선순위 임시 고정
     // _category = e?.category ?? EventCategory.personal;
     // _priority = e?.priority ?? EventPriority.medium;
     print('🔧 EventForm 초기화: 알림 시간 = $_alarmMinutesBefore분 전');
+  }
+
+  // 🔍 장소 이름으로 검색해서 좌표 찾기
+  void _searchAndSetInitialPlace(String placeName) async {
+    try {
+      print('🔍 장소 검색 시작: $placeName');
+      final places = await PlacesService.searchPlaces(placeName);
+      if (places.isNotEmpty) {
+        final place = places.first;
+        setState(() {
+          _selectedPlace = PlaceDetails(
+            placeId: place.placeId,
+            name: place.mainText,
+            address: place.description,
+            latitude: 0, // 검색 결과에는 좌표가 없으므로 상세 정보 필요
+            longitude: 0,
+            types: [],
+          );
+        });
+        
+        // Place Details로 정확한 좌표 가져오기
+        final detailedPlace = await PlacesService.getPlaceDetails(place.placeId);
+        if (detailedPlace != null && mounted) {
+          setState(() {
+            _selectedPlace = detailedPlace;
+          });
+          print('✅ 초기 장소 설정 완료: ${detailedPlace.name} (${detailedPlace.latitude}, ${detailedPlace.longitude})');
+        }
+      }
+    } catch (e) {
+      print('❌ 초기 장소 검색 실패: $e');
+    }
   }
 
   Future<void> _pickDateTime({required bool isStart}) async {
@@ -80,6 +128,7 @@ class _EventFormState extends State<EventForm> {
       MaterialPageRoute(
         builder: (context) => LocationPicker(
           initialLocation: _location,
+          initialPlace: _selectedPlace, // 저장된 장소 정보 전달
           onLocationSelected: (place) {
             setState(() {
               _selectedPlace = place;
@@ -108,6 +157,8 @@ class _EventFormState extends State<EventForm> {
         startTime: _startTime,
         endTime: _endTime,
         location: _location,
+        locationLatitude: _selectedPlace?.latitude, // 🗺️ 좌표 저장
+        locationLongitude: _selectedPlace?.longitude, // 🗺️ 좌표 저장
         category: EventCategory.other,
         priority: EventPriority.medium,
         isAllDay: false,

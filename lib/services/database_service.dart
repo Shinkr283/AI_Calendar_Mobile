@@ -29,7 +29,7 @@ class DatabaseService {
 
       final db = await openDatabase(
         path,
-        version: 2, // 버전 업그레이드: 알림 시간 필드 추가
+        version: 3, // 버전 업그레이드: 장소 좌표 필드 추가
         onCreate: _createDatabase,
         onUpgrade: _upgradeDatabase,
       );
@@ -81,6 +81,8 @@ class DatabaseService {
           startTime INTEGER NOT NULL,
           endTime INTEGER NOT NULL,
           location TEXT,
+          locationLatitude REAL,
+          locationLongitude REAL,
           category TEXT NOT NULL,
           priority INTEGER NOT NULL DEFAULT 2,
           isAllDay INTEGER NOT NULL DEFAULT 0,
@@ -152,6 +154,14 @@ class DatabaseService {
       print('📅 events 테이블에 alarmMinutesBefore 컬럼 추가 중...');
       await db.execute('ALTER TABLE events ADD COLUMN alarmMinutesBefore INTEGER NOT NULL DEFAULT 10');
       print('✅ alarmMinutesBefore 컬럼 추가 완료');
+    }
+    
+    if (oldVersion < 3) {
+      // 버전 3: 장소 좌표 필드 추가
+      print('🗺️ events 테이블에 장소 좌표 컬럼 추가 중...');
+      await db.execute('ALTER TABLE events ADD COLUMN locationLatitude REAL');
+      await db.execute('ALTER TABLE events ADD COLUMN locationLongitude REAL');
+      print('✅ 장소 좌표 컬럼 추가 완료');
     }
   }
 

@@ -10,6 +10,8 @@ class Event {
   final DateTime startTime;
   final DateTime endTime;
   final String location;
+  final double? locationLatitude; // 🗺️ 장소 위도
+  final double? locationLongitude; // 🗺️ 장소 경도
   final String category;
   final int priority; // 1: 낮음, 2: 보통, 3: 높음
   final bool isAllDay;
@@ -28,6 +30,8 @@ class Event {
     required this.startTime,
     required this.endTime,
     required this.location,
+    this.locationLatitude,
+    this.locationLongitude,
     required this.category,
     required this.priority,
     required this.isAllDay,
@@ -53,6 +57,8 @@ class Event {
       'startTime': startTime.millisecondsSinceEpoch,
       'endTime': endTime.millisecondsSinceEpoch,
       'location': location,
+      'locationLatitude': locationLatitude,
+      'locationLongitude': locationLongitude,
       'category': category,
       'priority': priority,
       'isAllDay': isAllDay ? 1 : 0,
@@ -75,6 +81,8 @@ class Event {
       startTime: DateTime.fromMillisecondsSinceEpoch(map['startTime'] as int),
       endTime: DateTime.fromMillisecondsSinceEpoch(map['endTime'] as int),
       location: map['location'] as String,
+      locationLatitude: map['locationLatitude'] as double?,
+      locationLongitude: map['locationLongitude'] as double?,
       category: map['category'] as String,
       priority: map['priority'] as int,
       isAllDay: (map['isAllDay'] as int) == 1,
@@ -98,6 +106,8 @@ class Event {
     DateTime? startTime,
     DateTime? endTime,
     String? location,
+    double? locationLatitude,
+    double? locationLongitude,
     String? category,
     int? priority,
     bool? isAllDay,
@@ -116,6 +126,8 @@ class Event {
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
       location: location ?? this.location,
+      locationLatitude: locationLatitude ?? this.locationLatitude,
+      locationLongitude: locationLongitude ?? this.locationLongitude,
       category: category ?? this.category,
       priority: priority ?? this.priority,
       isAllDay: isAllDay ?? this.isAllDay,
