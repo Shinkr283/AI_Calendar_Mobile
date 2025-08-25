@@ -1,5 +1,4 @@
 import 'package:intl/intl.dart';
-import 'package:geolocator/geolocator.dart';
 import 'event_service.dart';
 import 'location_service.dart';
 import 'weather_service.dart';
@@ -15,17 +14,14 @@ class BriefingService {
       final dateStr = DateFormat('yyyy년 MM월 dd일 EEEE', 'ko_KR').format(date);
 
       // 현재 위치 및 날씨 조회
-      Position? pos = await LocationService().getCurrentPosition();
-      String address = '';
+      final pos = await LocationService().getCurrentPosition();
+      final address = await LocationService().getAddressFrom(pos);
       String weatherDesc = '';
       String temp = '';
-      if (pos != null) {
-        address = await LocationService().getAddressFrom(pos);
-        final weatherData = await WeatherService().fetchWeather(pos.latitude, pos.longitude);
-        if (weatherData != null) {
-          weatherDesc = (weatherData['weather']?[0]?['description'] ?? '').toString();
-          temp = (weatherData['main']?['temp'] ?? '').toString();
-        }
+      final weatherData = await WeatherService().fetchWeather(pos.latitude, pos.longitude);
+      if (weatherData != null) {
+        weatherDesc = (weatherData['weather']?[0]?['description'] ?? '').toString();
+        temp = (weatherData['main']?['temp'] ?? '').toString();
       }
 
       // 일정 조회

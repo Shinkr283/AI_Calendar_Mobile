@@ -61,9 +61,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
     setState(() => _isLoading = true);
     final events = await EventService().getEventsForMonth(month);
     final holidays = await HolidayService().getHolidaysForYear(month.year);
-    final eventsFuture = EventService().getEventsForMonth(month);
     setState(() {
       _events = events;
+      _holidays = holidays;
       _isLoading = false;
     });
   }
@@ -71,7 +71,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
   void _onDaySelected(DateTime selectedDay, DateTime focusedDay) {
     setState(() {
       _selectedDay = selectedDay;
-      // _holidays = holidays;
       _focusedDay = focusedDay;
     });
     // 날짜를 선택해도 월 전체 일정을 유지
