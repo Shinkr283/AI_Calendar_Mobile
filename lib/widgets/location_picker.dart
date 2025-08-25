@@ -204,73 +204,11 @@ class _LocationPickerState extends State<LocationPicker> {
     }
   }
 
-  // 🏷️ 장소 타입을 한국어로 변환
-  String _getPlaceTypeDisplay(String type) {
-    final typeMap = {
-      'airport': '공항',
-      'restaurant': '음식점',
-      'hotel': '호텔',
-      'hospital': '병원',
-      'school': '학교',
-      'university': '대학교',
-      'bank': '은행',
-      'gas_station': '주유소',
-      'shopping_mall': '쇼핑몰',
-      'subway_station': '지하철역',
-      'bus_station': '버스정류장',
-      'park': '공원',
-      'tourist_attraction': '관광명소',
-      'establishment': '시설',
-      'point_of_interest': '관심장소',
-      'premise': '건물',
-      'political': '행정구역',
-      'administrative_area_level_1': '시/도',
-      'administrative_area_level_2': '시/군/구',
-      'locality': '지역',
-      'sublocality': '동네',
-      'route': '도로',
-    };
-    
-    return typeMap[type] ?? '장소';
-  }
+  // 장소 타입 변환 함수 제거됨 (상세 정보 표시 기능 제거됨)
 
-  // 🗺️ 지도 클릭 시 해당 위치 정보 가져오기
-  void _onMapTap(LatLng position) async {
-    setState(() {
-      _isLoading = true;
-    });
+  // 지도 터치 시 장소 정보 표시 기능 제거됨
 
-    try {
-      final placeDetails = await PlacesService.reverseGeocode(
-        position.latitude,
-        position.longitude,
-      );
-
-      if (placeDetails != null && mounted) {
-        setState(() {
-          _selectedPlace = placeDetails;
-          _searchController.text = placeDetails.name;
-          _suggestions = [];
-        });
-
-        // SnackBar 제거 - 불필요한 알림
-      }
-    } catch (e) {
-      print('❌ 역방향 지오코딩 실패: $e');
-    }
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  // 🎯 랜드마크 터치 시 실행되는 함수 (현재 버전에서는 onTap으로 대체)
-  // void _onPoiTap(PointOfInterest poi) async {
-  //   print('🏢 랜드마크 터치: ${poi.name} at ${poi.latLng.latitude}, ${poi.latLng.longitude}');
-  //   // ... POI 처리 로직
-  // }
+  // 랜드마크 터치 기능 제거됨
 
   @override
   Widget build(BuildContext context) {
@@ -346,8 +284,7 @@ class _LocationPickerState extends State<LocationPicker> {
             trafficEnabled: false,
             indoorViewEnabled: false,
             buildingsEnabled: true,
-            onTap: _onMapTap,
-            // onPoiTap: _onPoiTap, // 🎯 랜드마크 터치 기능 (현재 버전에서 지원하지 않음)
+            // 지도 터치 및 POI 터치 기능 제거됨
             liteModeEnabled: false,
             gestureRecognizers: const <Factory<OneSequenceGestureRecognizer>>{},
           ),
@@ -488,288 +425,66 @@ class _LocationPickerState extends State<LocationPicker> {
             ),
           ),
           
-          // 🔽 Google Maps 스타일 드래그 가능한 하단 슬라이딩 패널
+          // 📍 선택된 장소 간단 정보 (하단 고정)
           if (_selectedPlace != null)
-            DraggableScrollableSheet(
-              initialChildSize: 0.3, // 초기 크기 (화면의 30%)
-              minChildSize: 0.15,    // 최소 크기 (화면의 15%)
-              maxChildSize: 0.6,     // 최대 크기 (화면의 60%)
-              builder: (context, scrollController) {
-                return Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 10,
-                        offset: Offset(0, -2),
-                      ),
-                    ],
-              ),
-              child: Column(
-                    children: [
-                      // 🔒 드래그 핸들 (항상 상단에 고정)
-                      Container(
-                        margin: const EdgeInsets.symmetric(vertical: 8),
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      
-                      // 📋 스크롤 가능한 내용
-                      Expanded(
-                        child: SingleChildScrollView(
-                          controller: scrollController,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // 🏷️ 장소 타입 뱃지
-                              if (_selectedPlace!.types.isNotEmpty)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue.shade100,
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: Text(
-                                    _getPlaceTypeDisplay(_selectedPlace!.types.first),
-                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.blue.shade700,
-                                    ),
-                                  ),
-                                ),
-                              
-                              const SizedBox(height: 12),
-                              
-                              // 📍 장소명과 평점
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                                          _selectedPlace!.name,
-                                          style: const TextStyle(
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.black87,
-                                          ),
-                                        ),
-                  if (_selectedPlace!.rating != null) ...[
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                                              ...List.generate(5, (index) {
-                                                return Icon(
-                                                  index < (_selectedPlace!.rating! / 1).floor()
-                                                      ? Icons.star
-                                                      : index < (_selectedPlace!.rating! / 0.5).floor()
-                                                          ? Icons.star_half
-                                                          : Icons.star_border,
-                                                  color: Colors.amber,
-                                                  size: 18,
-                                                );
-                                              }),
-                                              const SizedBox(width: 6),
-                        Text(
-                                                '${_selectedPlace!.rating!.toStringAsFixed(1)}',
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 16,
-                          ),
-                        ),
-                      ],
+            Positioned(
+              bottom: 16,
+              left: 16,
+              right: 16,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
                     ),
                   ],
-                ],
-              ),
-            ),
-                                  IconButton(
-                                    onPressed: () {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('"${_selectedPlace!.name}" 즐겨찾기에 추가'),
-                                          backgroundColor: Colors.green,
-                                          duration: const Duration(seconds: 2),
-                                        ),
-                                      );
-                                    },
-                                    icon: const Icon(Icons.favorite_border),
-                                    color: Colors.red,
-                                  ),
-                                ],
-                              ),
-                              
-            const SizedBox(height: 16),
-                              
-                              // 📍 주소
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Icon(Icons.location_on, size: 20, color: Colors.red),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      _selectedPlace!.address,
-                                      style: TextStyle(
-                                        color: Colors.grey.shade700,
-                                        fontSize: 14,
-                                        height: 1.4,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              
-                              // 📞 전화번호
-                              if (_selectedPlace!.phoneNumber != null) ...[
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    const Icon(Icons.phone, size: 20, color: Colors.green),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        _selectedPlace!.phoneNumber!,
-                                        style: const TextStyle(
-                                          color: Colors.blue,
-                                          fontSize: 14,
-                                          decoration: TextDecoration.underline,
-                                        ),
-                                      ),
-                                    ),
-                                    IconButton(
-                                      onPressed: () {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('전화 앱으로 연결됩니다')),
-                                        );
-                                      },
-                                      icon: const Icon(Icons.call, size: 20, color: Colors.green),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                              
-                              // 🌐 웹사이트
-                              if (_selectedPlace!.website != null) ...[
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    const Icon(Icons.language, size: 20, color: Colors.blue),
-                                    const SizedBox(width: 8),
-                                    const Expanded(
-                                      child: Text(
-                                        '웹사이트 방문',
-                                        style: TextStyle(
-                                          color: Colors.blue,
-                                          fontSize: 14,
-                                          decoration: TextDecoration.underline,
-                                        ),
-                                      ),
-                                    ),
-                                    IconButton(
-                                      onPressed: () {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('웹 브라우저로 연결됩니다')),
-                                        );
-                                      },
-                                      icon: const Icon(Icons.open_in_new, size: 20, color: Colors.blue),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                              
-                              const SizedBox(height: 20),
-                              
-                              // 🛠️ 액션 버튼들
-                              Row(
-                                children: [
-          Expanded(
-                                    child: ElevatedButton.icon(
-                                      onPressed: () {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('길찾기 앱으로 연결됩니다')),
-                                        );
-                                      },
-                                      icon: const Icon(Icons.directions, size: 18),
-                                      label: const Text('길찾기'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.blue,
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      onPressed: () {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('장소 정보가 공유됩니다')),
-                                        );
-                                      },
-                                      icon: const Icon(Icons.share, size: 18),
-                                      label: const Text('공유'),
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: Colors.blue,
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              
-                              const SizedBox(height: 20),
-                              
-                              // 🎯 확인 버튼 (패널 내부로 이동)
-                              SizedBox(
-                                width: double.infinity,
-                                height: 50,
-                                child: ElevatedButton.icon(
-                                  onPressed: _confirmLocation,
-                                  icon: const Icon(Icons.check_circle, size: 20),
-                                  label: Text(
-                                    '"${_selectedPlace!.name}" 선택하기',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blue,
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(25),
-                                    ),
-                                    elevation: 2,
-                                  ),
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 16), // 하단 여백
-                            ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _selectedPlace!.name,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _selectedPlace!.address,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _confirmLocation,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
                           ),
                         ),
+                        child: const Text('이 장소 선택'),
                       ),
-                    ],
-                  ),
-                );
-              },
+                    ),
+                  ],
+                ),
+              ),
             ),
         ],
       ),
