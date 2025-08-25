@@ -35,7 +35,6 @@ class _LocationPickerState extends State<LocationPicker> {
   @override
   void initState() {
     super.initState();
-    _getCurrentLocation();
     
     // 🎯 초기 장소 정보가 있다면 우선 사용
     if (widget.initialPlace != null) {
@@ -45,7 +44,13 @@ class _LocationPickerState extends State<LocationPicker> {
     } else if (widget.initialLocation != null) {
       // 초기 위치가 설정되어 있다면 검색 필드에 표시
       _searchController.text = widget.initialLocation!;
+    } else {
+      // 🌍 새 일정 추가 시 - GPS 위치를 적극적으로 획득
+      print('🎯 새 일정 추가 - GPS 위치 우선 획득 시작');
     }
+    
+    // GPS 위치는 항상 획득 (캐싱용)
+    _getCurrentLocation();
   }
 
   @override
@@ -77,6 +82,34 @@ class _LocationPickerState extends State<LocationPicker> {
         });
       }
       print('❌ 현재 위치 획득 실패: $e');
+    }
+  }
+
+  // 🎯 GPS 위치 또는 기본 위치로 지도 이동 (새 일정 추가 시)
+  void _moveToCurrentLocationOrDefault(GoogleMapController controller) {
+    if (_currentLocation != null) {
+      // GPS 위치가 이미 있으면 즉시 이동
+      controller.animateCamera(
+        CameraUpdate.newLatLngZoom(_currentLocation!, 15.0),
+      );
+      print('📍 지도를 현재 GPS 위치로 이동: ${_currentLocation!.latitude}, ${_currentLocation!.longitude}');
+    } else {
+      // GPS 위치를 기다리면서 획득되면 이동
+      print('📍 GPS 위치 대기 중... 획득되면 자동 이동');
+      
+      // GPS 위치 획득 후 지도 이동을 위한 타이머 설정
+      Timer.periodic(const Duration(milliseconds: 200), (timer) {
+        if (_currentLocation != null && mounted) {
+          controller.animateCamera(
+            CameraUpdate.newLatLngZoom(_currentLocation!, 15.0),
+          );
+          print('📍 GPS 위치 획득 완료! 지도 이동: ${_currentLocation!.latitude}, ${_currentLocation!.longitude}');
+          timer.cancel();
+        } else if (timer.tick > 25) { // 5초 후 타임아웃
+          print('⏰ GPS 위치 획득 타임아웃 - 서울 기본 위치 사용');
+          timer.cancel();
+        }
+      });
     }
   }
 
@@ -232,8 +265,9 @@ class _LocationPickerState extends State<LocationPicker> {
             onMapCreated: (GoogleMapController controller) {
               _mapController = controller;
               
-              // 🗺️ 초기 장소가 있다면 즉시 이동 (지연 없음)
+              // 🗺️ 장소 우선순위: 기존 장소 > GPS 위치 > 기본 위치
               if (widget.initialPlace != null) {
+                // 기존 일정 수정 시 - 저장된 장소로 즉시 이동
                 controller.animateCamera(
                   CameraUpdate.newLatLngZoom(
                     LatLng(widget.initialPlace!.latitude, widget.initialPlace!.longitude), 
@@ -241,21 +275,9 @@ class _LocationPickerState extends State<LocationPicker> {
                   ),
                 );
                 print('📍 지도를 저장된 장소로 즉시 이동: ${widget.initialPlace!.name}');
-              } else if (_selectedPlace != null) {
-                // _selectedPlace가 있다면 해당 위치로 이동
-                controller.animateCamera(
-                  CameraUpdate.newLatLngZoom(
-                    LatLng(_selectedPlace!.latitude, _selectedPlace!.longitude), 
-                    16.0
-                  ),
-                );
-                print('📍 지도를 선택된 장소로 이동: ${_selectedPlace!.name}');
-              } else if (_currentLocation != null) {
-                Future.delayed(const Duration(milliseconds: 500), () {
-                  controller.animateCamera(
-                    CameraUpdate.newLatLngZoom(_currentLocation!, 15.0),
-                  );
-                });
+              } else {
+                // 새 일정 추가 시 - GPS 위치 우선 사용
+                _moveToCurrentLocationOrDefault(controller);
               }
             },
             markers: _selectedPlace != null

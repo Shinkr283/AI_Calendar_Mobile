@@ -83,6 +83,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       builder: (context) => AlertDialog(
         title: const Text('일정 추가'),
         content: EventForm(
+          selectedDate: _selectedDay, // 선택된 날짜 전달
           onSave: (event, alarmMinutesBefore) {
             Navigator.of(context).pop({
               'event': event,
@@ -646,7 +647,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
             calendarBuilders: CalendarBuilders(
               defaultBuilder: (context, day, focusedDay) {
-                final dayEvents = _events.where((e) => isSameDay(e.startTime, day)).toList();
                 return Container(
                   alignment: Alignment.topCenter,
                   child: Column(
@@ -655,22 +655,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     children: [
                       const SizedBox(height: 4),
                       Text('${day.day}', textAlign: TextAlign.center),
-                      if (dayEvents.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            dayEvents.first.title.length > 8
-                                ? dayEvents.first.title.substring(0, 8) + '...'
-                                : dayEvents.first.title,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: Colors.blueAccent,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            maxLines: 1,
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
+                      // 일정 제목 텍스트 제거 - 파란색 막대바와 겹침 방지
                       if (_holidays.containsKey(_fmtDate(day)))
                         Padding(
                           padding: const EdgeInsets.only(top: 2),
@@ -686,7 +671,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 );
               },
               todayBuilder: (context, day, focusedDay) {
-                final dayEvents = _events.where((e) => isSameDay(e.startTime, day)).toList();
                 return Container(
                   alignment: Alignment.topCenter,
                   decoration: BoxDecoration(
@@ -699,28 +683,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     children: [
                       const SizedBox(height: 4),
                       Text('${day.day}', style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-                      if (dayEvents.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            dayEvents.first.title.length > 8
-                                ? dayEvents.first.title.substring(0, 8) + '...'
-                                : dayEvents.first.title,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: Colors.blueAccent,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            maxLines: 1,
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
+                      // 일정 제목 텍스트 제거 - 파란색 막대바와 겹침 방지
                     ],
                   ),
                 );
               },
               selectedBuilder: (context, day, focusedDay) {
-                final dayEvents = _events.where((e) => isSameDay(e.startTime, day)).toList();
                 return Container(
                   alignment: Alignment.topCenter,
                   decoration: BoxDecoration(
@@ -733,28 +701,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     children: [
                       const SizedBox(height: 4),
                       Text('${day.day}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-                      if (dayEvents.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            dayEvents.first.title.length > 8
-                                ? dayEvents.first.title.substring(0, 8) + '...'
-                                : dayEvents.first.title,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: Colors.white,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            maxLines: 1,
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
+                      // 일정 제목 텍스트 제거 - 파란색 막대바와 겹침 방지
                     ],
                   ),
                 );
               },
               outsideBuilder: (context, day, focusedDay) {
-                final dayEvents = _events.where((e) => isSameDay(e.startTime, day)).toList();
                 return Container(
                   alignment: Alignment.topCenter,
                   child: Column(
@@ -763,22 +715,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     children: [
                       const SizedBox(height: 4),
                       Text('${day.day}', style: const TextStyle(color: Colors.grey), textAlign: TextAlign.center),
-                      if (dayEvents.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            dayEvents.first.title.length > 8
-                                ? dayEvents.first.title.substring(0, 8) + '...'
-                                : dayEvents.first.title,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            maxLines: 1,
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
+                      // 일정 제목 텍스트 제거 - 파란색 막대바와 겹침 방지
                     ],
                   ),
                 );
@@ -788,13 +725,49 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     .where((e) => !e.isCompleted && (e.startTime.month == day.month || e.endTime.month == day.month))
                     .toList();
                 monthEvents.sort((a, b) => a.startTime.compareTo(b.startTime));
+                
+                // 🎯 각 일정에 대해 라인 할당 (겹치지 않도록)
                 final Map<String, int> eventLineMap = {};
-                int line = 0;
+                final List<List<Event>> lines = [];
+                
                 for (final event in monthEvents) {
-                  eventLineMap[event.id] = line++;
+                  int assignedLine = -1;
+                  
+                  // 기존 라인들 중에서 겹치지 않는 라인 찾기
+                  for (int i = 0; i < lines.length; i++) {
+                    bool canFit = true;
+                    for (final lineEvent in lines[i]) {
+                      if (!(event.endTime.isBefore(lineEvent.startTime) || 
+                            event.startTime.isAfter(lineEvent.endTime))) {
+                        canFit = false;
+                        break;
+                      }
+                    }
+                    if (canFit) {
+                      assignedLine = i;
+                      break;
+                    }
+                  }
+                  
+                  // 새로운 라인 생성
+                  if (assignedLine == -1) {
+                    assignedLine = lines.length;
+                    lines.add([]);
+                  }
+                  
+                  lines[assignedLine].add(event);
+                  eventLineMap[event.id] = assignedLine;
                 }
 
-                final todayEvents = monthEvents.where((e) => !e.startTime.isAfter(day) && !e.endTime.isBefore(day)).toList();
+                final todayEvents = monthEvents.where((e) {
+                  // 🎯 날짜 범위 확인: 시작일 <= 현재날 <= 종료일
+                  final startDate = DateTime(e.startTime.year, e.startTime.month, e.startTime.day);
+                  final endDate = DateTime(e.endTime.year, e.endTime.month, e.endTime.day);
+                  final currentDate = DateTime(day.year, day.month, day.day);
+                  
+                  return !currentDate.isBefore(startDate) && !currentDate.isAfter(endDate);
+                }).toList();
+                
                 if (todayEvents.isEmpty) return const SizedBox.shrink();
 
                 return Stack(
@@ -803,43 +776,42 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     final isStart = isSameDay(event.startTime, day);
                     final isEnd = isSameDay(event.endTime, day);
                     final isSingle = isStart && isEnd;
-                    BorderRadius borderRadius;
-                    double left = 2, right = 2;
-                    if (isSingle) {
-                      borderRadius = BorderRadius.circular(6);
-                    } else if (isStart) {
-                      borderRadius = const BorderRadius.horizontal(left: Radius.circular(6));
-                      right = 0;
-                    } else if (isEnd) {
-                      borderRadius = const BorderRadius.horizontal(right: Radius.circular(6));
-                      left = 0;
-                    } else {
-                      borderRadius = BorderRadius.zero;
-                      left = 0;
-                      right = 0;
-                    }
+                    
+                    // 🎨 첫 번째 이미지처럼 연속된 막대 디자인
                     return Positioned(
-                      left: left,
-                      right: right,
-                      top: 24.0 + idx * 16.0,
-                      height: 16,
+                      left: isSingle ? 4 : (isStart ? 4 : 0),
+                      right: isSingle ? 4 : (isEnd ? 4 : 0),
+                      top: 24.0 + idx * 14.0, // 더 촘촘하게 배치
+                      height: 12, // 더 얇게
                       child: Container(
-                        alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: Colors.lightBlue,
-                          borderRadius: borderRadius,
+                          color: const Color(0xFF4FC3F7), // 하늘색 계열
+                          borderRadius: isSingle 
+                            ? BorderRadius.circular(6)
+                            : isStart 
+                              ? const BorderRadius.horizontal(left: Radius.circular(6))
+                              : isEnd 
+                                ? const BorderRadius.horizontal(right: Radius.circular(6))
+                                : BorderRadius.zero,
                         ),
-                        child: Text(
-                          event.title.length > 8 ? event.title.substring(0, 8) + '…' : event.title,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          maxLines: 1,
-                          textAlign: TextAlign.center,
-                        ),
+                        child: isStart // 시작일에만 제목 표시
+                          ? Align(
+                              alignment: Alignment.centerLeft,
+                              child: Padding(
+                                padding: const EdgeInsets.only(left: 4.0),
+                                child: Text(
+                                  event.title.length > 7 ? event.title.substring(0, 7) + '…' : event.title,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            )
+                          : const SizedBox.shrink(), // 중간일과 끝일에는 빈 공간
                       ),
                     );
                   }).toList(),
@@ -851,12 +823,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _events.isEmpty
-                    ? const Center(child: Text('일정이 없습니다.'))
+                : _getSelectedDayEvents().isEmpty
+                    ? const Center(child: Text('선택된 날짜에 일정이 없습니다.'))
                     : ListView.builder(
-                        itemCount: _events.length,
+                        itemCount: _getSelectedDayEvents().length,
                         itemBuilder: (context, index) {
-                          final event = _events[index];
+                          final event = _getSelectedDayEvents()[index];
                           return Card(
                             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                             child: ListTile(
@@ -913,6 +885,21 @@ class _CalendarScreenState extends State<CalendarScreen> {
       ),
     );
   }
+
+  /// 선택된 날짜의 일정만 반환
+  List<Event> _getSelectedDayEvents() {
+    if (_selectedDay == null) return [];
+    
+    return _events.where((event) {
+      // 🎯 날짜 범위 확인: 시작일 <= 선택된날 <= 종료일
+      final startDate = DateTime(event.startTime.year, event.startTime.month, event.startTime.day);
+      final endDate = DateTime(event.endTime.year, event.endTime.month, event.endTime.day);
+      final selectedDate = DateTime(_selectedDay!.year, _selectedDay!.month, _selectedDay!.day);
+      
+      return !selectedDate.isBefore(startDate) && !selectedDate.isAfter(endDate);
+    }).toList();
+  }
+
   Future<void> _onSyncWithGoogle() async {
     setState(() => _isLoading = true);
     try {

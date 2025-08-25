@@ -20,6 +20,7 @@ class EventService {
     required DateTime endTime,
     required int alarmMinutesBefore,
     String? location,
+    bool isAllDay = false,
   }) async {
     final event = Event(
       id: _generateEventId(),
@@ -29,6 +30,7 @@ class EventService {
       endTime: endTime,
       location: location ?? '',
       isCompleted: false,
+      isAllDay: isAllDay,
       alarmMinutesBefore: alarmMinutesBefore,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
@@ -85,9 +87,32 @@ class EventService {
     );
   }
 
+  // 날짜 범위의 일정 조회
+  Future<List<Event>> getEventsForDateRange(DateTime startDate, DateTime endDate) async {
+    return await getEvents(
+      startDate: startDate,
+      endDate: endDate,
+    );
+  }
+
   // 일정 수정
   Future<Event> updateEvent(Event event) async {
     final updatedEvent = event.copyWith(
+      updatedAt: DateTime.now(),
+    );
+    await _databaseService.updateEvent(updatedEvent);
+    return updatedEvent;
+  }
+
+  // 일정 수정 (Google Event ID 포함)
+  Future<Event> updateEventWithGoogleId(String eventId, {String? googleEventId}) async {
+    final event = await getEvent(eventId);
+    if (event == null) {
+      throw Exception('일정을 찾을 수 없습니다: $eventId');
+    }
+    
+    final updatedEvent = event.copyWith(
+      googleEventId: googleEventId ?? event.googleEventId,
       updatedAt: DateTime.now(),
     );
     await _databaseService.updateEvent(updatedEvent);

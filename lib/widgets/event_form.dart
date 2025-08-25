@@ -5,11 +5,13 @@ import 'location_picker.dart';
 
 class EventForm extends StatefulWidget {
   final Event? initialEvent;
+  final DateTime? selectedDate; // 선택된 날짜 추가
   final void Function(Event event, int alarmMinutesBefore) onSave;
 
   const EventForm({
     super.key,
     this.initialEvent,
+    this.selectedDate, // 선택된 날짜 추가
     required this.onSave,
   });
 
@@ -34,8 +36,29 @@ class _EventFormState extends State<EventForm> {
     final e = widget.initialEvent;
     _title = e?.title ?? '';
     _description = e?.description ?? '';
-    _startTime = e?.startTime ?? DateTime.now();
-    _endTime = e?.endTime ?? DateTime.now().add(const Duration(hours: 1));
+    
+    // 🗓️ 선택된 날짜가 있으면 해당 날짜로 시작 시간 설정
+    if (e != null) {
+      // 기존 일정 수정 시에는 기존 시간 유지
+      _startTime = e.startTime;
+      _endTime = e.endTime;
+    } else if (widget.selectedDate != null) {
+      // 새 일정 추가 시 선택된 날짜의 현재 시간으로 설정
+      final now = DateTime.now();
+      _startTime = DateTime(
+        widget.selectedDate!.year,
+        widget.selectedDate!.month,
+        widget.selectedDate!.day,
+        now.hour,
+        now.minute,
+      );
+      _endTime = _startTime.add(const Duration(hours: 1));
+    } else {
+      // 선택된 날짜가 없으면 현재 시간 사용
+      _startTime = DateTime.now();
+      _endTime = DateTime.now().add(const Duration(hours: 1));
+    }
+    
     _location = e?.location ?? '';
     _alarmMinutesBefore = e?.alarmMinutesBefore ?? 10; // 기존 일정의 알림 시간 복원
 
@@ -216,18 +239,7 @@ class _EventFormState extends State<EventForm> {
                               fontSize: 16,
                             ),
                           ),
-                          if (_selectedPlace != null && _selectedPlace!.address.isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              _selectedPlace!.address,
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 12,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
+                          // 세부 주소 표시 제거 - UI 크기 고정을 위해
                         ],
                       ),
                     ),

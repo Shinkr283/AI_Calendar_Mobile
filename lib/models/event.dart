@@ -14,6 +14,7 @@ class Event {
   final double? locationLongitude; // 🗺️ 장소 경도
   final String? googleEventId; // Google Calendar Event ID (동기화용)
   final bool isCompleted;
+  final bool isAllDay; // 하루 종일 이벤트 여부
   final int alarmMinutesBefore; // 알림 시간 (분 단위, 0이면 알림 없음)
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -29,6 +30,7 @@ class Event {
     this.locationLongitude,
     this.googleEventId,
     required this.isCompleted,
+    this.isAllDay = false,
     required this.alarmMinutesBefore,
     required this.createdAt,
     required this.updatedAt,
@@ -51,6 +53,7 @@ class Event {
       'locationLongitude': locationLongitude,
       'googleEventId': googleEventId,
       'isCompleted': isCompleted ? 1 : 0,
+      'isAllDay': isAllDay ? 1 : 0,
       'alarmMinutesBefore': alarmMinutesBefore,
       'createdAt': createdAt.millisecondsSinceEpoch,
       'updatedAt': updatedAt.millisecondsSinceEpoch,
@@ -67,6 +70,7 @@ class Event {
       endTime: DateTime.fromMillisecondsSinceEpoch(map['endTime'] as int),
       location: map['location'] as String,
       isCompleted: (map['isCompleted'] as int) == 1,
+      isAllDay: (map['isAllDay'] as int?) == 1,
       googleEventId: map['googleEventId'] as String?,
       alarmMinutesBefore: (map['alarmMinutesBefore'] as int?) ?? 10, // 기본값 10분
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
@@ -86,6 +90,7 @@ class Event {
     double? locationLongitude,
     String? googleEventId,
     bool? isCompleted,
+    bool? isAllDay,
     int? alarmMinutesBefore,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -101,6 +106,7 @@ class Event {
       locationLongitude: locationLongitude ?? this.locationLongitude,
       googleEventId: googleEventId ?? this.googleEventId,
       isCompleted: isCompleted ?? this.isCompleted,
+      isAllDay: isAllDay ?? this.isAllDay,
       alarmMinutesBefore: alarmMinutesBefore ?? this.alarmMinutesBefore,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

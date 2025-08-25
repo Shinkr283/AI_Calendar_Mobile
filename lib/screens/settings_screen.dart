@@ -108,72 +108,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> _syncGoogleCalendar() async {
+  Future<void> _importFromGoogleCalendar() async {
     try {
       setState(() {
         _isLoading = true;
       });
 
-      if (_isCalendarSynced) {
-        // 동기화 해제
-        setState(() {
-          _isCalendarSynced = false;
-          _isLoading = false;
-        });
-        await _saveSettings();
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('구글 캘린더 동기화를 해제했습니다'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-      } else {
-        // 동기화 활성화 - 실제 구글 캘린더 동기화 수행
-        try {
-          print('📅 구글 캘린더 실제 동기화 시작');
-          
-          // SimpleGoogleCalendarService를 사용하여 실제 동기화
-          final calendarService = SimpleGoogleCalendarService();
-          final syncedCount = await calendarService.syncFromGoogleCalendar();
-          
-          setState(() {
-            _isCalendarSynced = true;
-            _isLoading = false;
-          });
-          await _saveSettings();
-          
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('구글 캘린더 동기화 완료! ${syncedCount}개 일정을 가져왔습니다'),
-                backgroundColor: Colors.green,
-                duration: const Duration(seconds: 4),
-              ),
-            );
-          }
-        } catch (e) {
-          print('❌ 캘린더 동기화 실패: $e');
-          
-          setState(() {
-            _isCalendarSynced = false;
-            _isLoading = false;
-          });
-          
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('구글 캘린더 동기화 실패: ${e.toString()}'),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 4),
-              ),
-            );
-          }
-        }
-      }
-    } catch (e) {
+      print('📥 구글 캘린더에서 일정 가져오기 시작');
+      
+      // SimpleGoogleCalendarService를 사용하여 일정 가져오기
+      final calendarService = SimpleGoogleCalendarService();
+      final syncedCount = await calendarService.syncFromGoogleCalendar();
+      
       setState(() {
         _isLoading = false;
       });
@@ -181,8 +127,69 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('캘린더 동기화 실패: $e'),
+            content: Text('구글 캘린더에서 ${syncedCount}개 일정을 가져왔습니다'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ 구글 캘린더 일정 가져오기 실패: $e');
+      
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('구글 캘린더 일정 가져오기 실패: ${e.toString()}'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _exportToGoogleCalendar() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      print('📤 구글 캘린더로 일정 내보내기 시작');
+      
+      // SimpleGoogleCalendarService를 사용하여 일정 내보내기
+      final calendarService = SimpleGoogleCalendarService();
+      final exportedCount = await calendarService.exportToGoogleCalendar();
+      
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('구글 캘린더로 ${exportedCount}개 일정을 내보냈습니다'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ 구글 캘린더로 일정 내보내기 실패: $e');
+      
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('구글 캘린더로 일정 내보내기 실패: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
           ),
         );
       }
@@ -412,15 +419,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
               '구글 서비스',
               [
                 _buildSettingsTile(
-                  icon: Icons.sync,
-                  title: '구글 캘린더 동기화',
-                  subtitle: _isCalendarSynced ? '동기화됨' : '동기화 안됨',
-                  trailing: Switch(
-                    value: _isCalendarSynced,
-                    onChanged: (value) => _syncGoogleCalendar(),
-                  ),
-                  onTap: _syncGoogleCalendar,
-                  iconColor: _isCalendarSynced ? Colors.green : Colors.grey,
+                  icon: Icons.download,
+                  title: '구글 캘린더 일정 가져오기',
+                  subtitle: '구글 캘린더에서 일정을 가져옵니다',
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _importFromGoogleCalendar,
+                  iconColor: Colors.blue,
+                ),
+                _buildSettingsTile(
+                  icon: Icons.upload,
+                  title: '구글 캘린더로 일정 내보내기',
+                  subtitle: '우리 앱의 일정을 구글 캘린더로 내보냅니다',
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _exportToGoogleCalendar,
+                  iconColor: Colors.green,
                 ),
               ],
             ),

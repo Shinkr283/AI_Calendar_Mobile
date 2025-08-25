@@ -27,12 +27,12 @@ class DatabaseService {
       final path = join(databasesPath, 'ai_calendar.db');
       print('📁 데이터베이스 경로: $path');
 
-      final db = await openDatabase(
-        path,
-        version: 3, // 버전 업그레이드: 장소 좌표 필드 추가
-        onCreate: _createDatabase,
-        onUpgrade: _upgradeDatabase,
-      );
+             final db = await openDatabase(
+         path,
+         version: 4, // 버전 업그레이드: isAllDay 필드 추가
+         onCreate: _createDatabase,
+         onUpgrade: _upgradeDatabase,
+       );
       
       print('✅ 데이터베이스 초기화 완료');
       
@@ -85,6 +85,7 @@ class DatabaseService {
           locationLongitude REAL,
           googleEventId TEXT,
           isCompleted INTEGER NOT NULL DEFAULT 0,
+          isAllDay INTEGER NOT NULL DEFAULT 0,
           alarmMinutesBefore INTEGER NOT NULL DEFAULT 10,
           createdAt INTEGER NOT NULL,
           updatedAt INTEGER NOT NULL
@@ -158,6 +159,13 @@ class DatabaseService {
       await db.execute('ALTER TABLE events ADD COLUMN locationLatitude REAL');
       await db.execute('ALTER TABLE events ADD COLUMN locationLongitude REAL');
       print('✅ 장소 좌표 컬럼 추가 완료');
+    }
+    
+    if (oldVersion < 4) {
+      // 버전 4: isAllDay 필드 추가
+      print('📅 events 테이블에 isAllDay 컬럼 추가 중...');
+      await db.execute('ALTER TABLE events ADD COLUMN isAllDay INTEGER NOT NULL DEFAULT 0');
+      print('✅ isAllDay 컬럼 추가 완료');
     }
   }
 
