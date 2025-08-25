@@ -112,15 +112,25 @@ class CalendarSyncService {
       if (gId != null) {
         final local = await EventService().getEventByGoogleId(gId);
         if (local != null) {
-          final updatedLocal = local.copyWith(
-            title: ev.summary ?? local.title,
-            description: ev.description ?? local.description,
-            startTime: startTime,
-            endTime: endTime,
-            location: ev.location ?? local.location,
-            updatedAt: DateTime.now(),
-          );
-          await EventService().updateEvent(updatedLocal);
+          // 구글/로컬 중 더 최신의 수정본을 채택
+          final googleUpdated = ev.updated?.toLocal();
+          final isGoogleNewer = googleUpdated != null && googleUpdated.isAfter(local.updatedAt);
+
+          if (isGoogleNewer) {
+            final updatedLocal = local.copyWith(
+              title: ev.summary ?? local.title,
+              description: ev.description ?? local.description,
+              startTime: startTime,
+              endTime: endTime,
+              location: ev.location ?? local.location,
+              updatedAt: googleUpdated,
+            );
+            await EventService().updateEvent(updatedLocal);
+          } else if (!readonly) {
+            // 로컬이 더 최신이면 구글로 푸시
+            await svc.updateEventFromLocal(gId, local);
+          }
+
           syncedIds.add(gId);
           continue;
         }
@@ -144,20 +154,9 @@ class CalendarSyncService {
         }
       }
 
-      final created = await EventService().createEvent(
-        title: ev.summary ?? '(제목 없음)',
-        description: ev.description ?? '',
-        startTime: startTime,
-        endTime: endTime,
-        location: ev.location ?? '',
-        alarmMinutesBefore: 10,
-      );
-      if (gId != null) {
-        final updated = created.copyWith(googleEventId: gId);
-        await EventService().updateEvent(updated);
-        syncedIds.add(gId);
-      }
-      inserted++;
+      // 변경 동기화 모드에서는 신규 로컬 이벤트를 생성하지 않습니다.
+      // (기존 gid 매칭/수동 매칭된 이벤트만 업데이트)
+      continue;
     }
 
     await prefs.setStringList('google_synced_event_ids', syncedIds.toList());

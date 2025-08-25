@@ -3,10 +3,10 @@ import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 import 'package:provider/provider.dart';
 import '../services/chat_service.dart'; // ChatProvider를 import
-import '../services/chat_location_weather_service.dart';
+import '../services/weather_service.dart';
 import '../services/places_service.dart';
 import 'map_screen.dart';
-import '../services/briefing_service.dart';
+import '../services/chat_briefing_service.dart';
 
 class ChatScreen extends StatelessWidget {
   const ChatScreen({super.key});
@@ -62,12 +62,23 @@ class ChatScreen extends StatelessWidget {
               final weatherMatch = RegExp(r'(.+?)\s*날씨').firstMatch(text);
               if (weatherMatch != null) {
                 final location = weatherMatch.group(1)!.trim();
-                final resultText = await LocationWeatherService().getWeatherForLocation(location);
-                provider.addAssistantText(resultText);
+                final place = await PlacesService.geocodeAddress(location);
+                if (place != null) {
+                  final weather = await WeatherService().fetchWeather(place.latitude, place.longitude);
+                  if (weather != null) {
+                    final desc = (weather['weather']?[0]?['description'] ?? '').toString();
+                    final temp = (weather['main']?['temp'] ?? '').toString();
+                    provider.addAssistantText('"${place.address}"의 날씨: $desc, 기온: ${temp}°C');
+                  } else {
+                    provider.addAssistantText('죄송합니다. "${place.address}"의 날씨 정보를 가져올 수 없습니다.');
+                  }
+                } else {
+                  provider.addAssistantText('죄송합니다. "$location" 위치를 찾을 수 없습니다.');
+                }
                 return;
               }
               // '<장소> 위치' 요청: 지도 화면으로 이동
-              final locMatch = RegExp(r'(.+?)\s*(위치|장소)').firstMatch(text);
+              final locMatch = RegExp(r'(.+?)\s*(위치|장소)\s*(보여줘|알려줘)').firstMatch(text);
               if (locMatch != null) {
                 final location = locMatch.group(1)!.trim();
                 final place = await PlacesService.geocodeAddress(location);

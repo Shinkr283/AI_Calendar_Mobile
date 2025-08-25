@@ -14,10 +14,14 @@ import 'location_service.dart';
 import 'user_service.dart';
 import 'chat_mbti_service.dart';
 import 'chat_schedule_service.dart';
+import 'chat_schedule_update.dart';
 import 'chat_gemini_service.dart';
 import 'chat_prompt_service.dart';
+import 'chat_briefing_service.dart';
 import 'chat_weather_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'chat_recommend_service.dart';
+import 'chat_location_service.dart';
 
 class ChatService {
   static final ChatService _instance = ChatService._internal();
@@ -105,9 +109,10 @@ class ChatProvider with ChangeNotifier {
   // 각 기능별 서비스들
   final GeminiService _geminiService = GeminiService();
   final MbtiService _mbtiService = MbtiService();
-  final CalendarService _calendarService = CalendarService();
+  final ChatScheduleService _calendarService = ChatScheduleService();
   final PromptService _promptService = PromptService();
-  final WeatherChatService _weatherService = WeatherChatService();
+  final ChatWeatherService _weatherService = ChatWeatherService();
+  final ChatRecommendService _recommendService = ChatRecommendService();
 
   
   String _currentUserMbti = 'INFP'; // 기본값
@@ -118,10 +123,7 @@ class ChatProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
 
   ChatProvider() {
-    // 초기화를 지연시켜 앱 로딩 속도 개선
-    Future.delayed(const Duration(milliseconds: 100), () {
-      _initialize();
-    });
+    _initialize();
   }
 
   // 비동기 초기화
@@ -160,99 +162,15 @@ class ChatProvider with ChangeNotifier {
   // 초기 메시지 로드 (오늘 일정 브리핑)
   Future<void> _loadInitialMessage() async {
     try {
-      final eventService = EventService();
-      final todayDate = DateFormat('yyyy년 MM월 dd일 EEEE', 'ko_KR').format(DateTime.now());
+      // 오늘 일정 브리핑 조회 (BriefingService 내부에서 필요한 데이터 수집)
+      final contextPrompt = await BriefingService().getBriefingForDate(DateTime.now());
 
-      // 병렬 로딩 + 타임아웃 적용
-      final eventsFuture = eventService.getTodayEvents();
-      final posFuture = _withTimeout(LocationService().getCurrentPosition(), const Duration(seconds: 2));
-
-      final results = await Future.wait([
-        eventsFuture,
-        posFuture,
-      ], eagerError: false);
-
-      final todayEvents = results[0] as List<Event>;
-      Position? pos = results[1] as Position?;
-      // 위치 타임아웃/실패 시 마지막 위치로 보완 시도
-      pos ??= await _withTimeout(LocationService().getLastKnownPosition(), const Duration(seconds: 1));
-
-      // 위치 / 날씨 / 주소 (위치가 있을 때만, 2초 타임아웃)
-      String city = '';
-      String temp = '';
-      String weatherDesc = '';
-      String address = '';
-      double? lat;
-      double? lon;
-      final prefsWX = await SharedPreferences.getInstance();
-      if (pos != null) {
-        lat = pos.latitude;
-        lon = pos.longitude;
-        address = await _withTimeout(LocationService().getAddressFrom(pos), const Duration(seconds: 2)) ?? '';
-      } else {
-        // 캐시 좌표 사용 시도
-        lat = double.tryParse(prefsWX.getString('last_lat') ?? '');
-        lon = double.tryParse(prefsWX.getString('last_lon') ?? '');
-        address = prefsWX.getString('last_address') ?? '';
-      }
-      // 최종 실패 시 서울 기본값
-      lat ??= 37.5665;
-      lon ??= 126.9780;
-      if (address.isEmpty) address = '서울특별시';
-      final weather = await _withTimeout(WeatherService().fetchWeather(lat, lon), const Duration(seconds: 2));
-      if (weather != null) {
-        city = (weather['name'] ?? '').toString();
-        temp = (weather['main']?['temp'] ?? '').toString();
-        weatherDesc = (weather['weather']?[0]?['description'] ?? '').toString();
-        // 캐시 저장
-        await prefsWX.setString('last_lat', lat.toString());
-        await prefsWX.setString('last_lon', lon.toString());
-        await prefsWX.setString('last_address', address);
-        await prefsWX.setString('last_weather', jsonEncode(weather));
-      } else {
-        // 캐시 날씨 폴백
-        final cached = prefsWX.getString('last_weather');
-        if (cached != null && cached.isNotEmpty) {
-          try {
-            final w = jsonDecode(cached) as Map<String, dynamic>;
-            city = (w['name'] ?? '').toString();
-            temp = (w['main']?['temp'] ?? '').toString();
-            weatherDesc = (w['weather']?[0]?['description'] ?? '').toString();
-          } catch (_) {}
-        }
-      }
-
-      // 일정 리스트 문자열화
-      final eventListBuffer = StringBuffer();
-      if (todayEvents.isEmpty) {
-        eventListBuffer.writeln('- (없음)');
-      } else {
-        todayEvents.sort((a, b) => a.startTime.compareTo(b.startTime));
-        for (final e in todayEvents) {
-          final t = DateFormat('HH:mm').format(e.startTime);
-          eventListBuffer.writeln('- $t: ${e.title}');
-        }
-      }
-
-      // LLM에게 최종 브리핑 작성을 맡김 (키워드 규칙 없이, 사용자/날씨/일정/위치 기반)
-      final locLine = address.isNotEmpty ? address : city;
-      final eventsBlock = _promptService.buildEventsBlock(todayEvents, limit: 5);
-      final contextPrompt = await _promptService.buildContextPrompt(
-        todayDate: todayDate,
-        locLine: locLine,
-        weatherDesc: weatherDesc,
-        temp: temp,
-        mbtiStyle: await _promptService.getMbtiStyleBlock(_currentUserMbti),
-        eventsBlock: eventsBlock,
-      );
-
-      // LLM 비동기 생성
+      // 초기 브리핑은 함수 선언 없이 경량 호출로 속도 최적화
       final systemPrompt = _promptService.createSystemPrompt(_currentUserMbti);
-      final functionDeclarations = _getAllFunctionDeclarations();
       final response = await _geminiService.sendMessage(
         message: contextPrompt,
         systemPrompt: systemPrompt,
-        functionDeclarations: functionDeclarations,
+        functionDeclarations: const [],
         conversationHistory: _conversationHistory,
       ).timeout(const Duration(seconds: 10));
       final refined = (response.text ?? '').trim();
@@ -293,12 +211,22 @@ class ChatProvider with ChangeNotifier {
     }
     
     // 캘린더 관련 function calls
-    if (['getCalendarEvents', 'createCalendarEvent', 'updateCalendarEvent', 'deleteCalendarEvent'].contains(call.name)) {
+    if (call.name == 'createCalendarEvent') {
+      return await ChatScheduleUpdate().createOrUpdateEvent(call.args);
+    }
+    if (call.name == 'updateCalendarEvent') {
+      return await ChatScheduleUpdate().updateEvent(call.args);
+    }
+    if (['getCalendarEvents', 'deleteCalendarEvent'].contains(call.name)) {
       return await _calendarService.handleFunctionCall(call);
     }
     // 날씨 관련 function calls
-    if (['getCurrentLocationWeather'].contains(call.name)) {
+    if (['getCurrentLocationWeather', 'getWeatherByDate'].contains(call.name)) {
       return await _weatherService.handleFunctionCall(call);
+    }
+    // 맛집 추천 function calls
+    if (call.name == 'getNearbyRestaurants') {
+      return await _recommendService.handleFunctionCall(call);
     }
     
     return {'status': '오류: 알 수 없는 함수입니다.'};
@@ -308,8 +236,9 @@ class ChatProvider with ChangeNotifier {
   List<Map<String, dynamic>> _getAllFunctionDeclarations() {
     return [
       ...MbtiService.functions,
-      ...CalendarService.functions,
-      ...WeatherChatService.functions,
+      ...ChatScheduleService.functions,
+      ...ChatWeatherService.functions,
+      ...ChatRecommendService.functions,
     ];
   }
 
@@ -363,28 +292,17 @@ class ChatProvider with ChangeNotifier {
         _conversationHistory.add({'parts': [{'text': aiText}], 'role': 'model'});
         return;
       }
-      // 빠른 로컬 질의 처리: 현재 위치 질문
-      final locationQuery = RegExp(r'(현재\s*(위치|장소)|내\s*(위치|장소))');
-      if (locationQuery.hasMatch(processedText)) {
-        // 위치 조회 및 주소 변환 (타임아웃 2초)
-        Position? pos = await _withTimeout(LocationService().getCurrentPosition(), const Duration(seconds: 2));
-        String address = '';
-        if (pos != null) {
-          address = await _withTimeout(LocationService().getAddressFrom(pos), const Duration(seconds: 2)) ?? '';
-        }
-        final aiText = address.isNotEmpty
-            ? '현재 위치는 $address 입니다.'
-            : '죄송합니다, 현재 위치를 알 수 없습니다.';
-        final aiMessage = types.TextMessage(
-          author: _aiAssistant,
-          createdAt: DateTime.now().millisecondsSinceEpoch,
-          id: _randomString(),
-          text: aiText,
-        );
-        _addMessage(aiMessage);
-        _conversationHistory.add({'parts': [{'text': aiText}], 'role': 'model'});
-        _isLoading = false;
-        notifyListeners();
+      // 일정 위치 로컬 처리: 서비스에 위임
+      if (RegExp(r'일정.*(위치|장소)').hasMatch(processedText)) {
+        final reply = await ChatLocationService().getEventLocation();
+        _addMessage(types.TextMessage(author: _aiAssistant, createdAt: DateTime.now().millisecondsSinceEpoch, id: _randomString(), text: reply));
+        return;
+      }
+      // 일정 날씨 로컬 처리: 서비스에 위임
+      if (RegExp(r'일정.*날씨').hasMatch(processedText)) {
+        final res = await _weatherService.handleFunctionCall(GeminiFunctionCall(name: 'getWeatherForTodayEvent', args: {}));
+        final reply = res['status'] as String;
+        _addMessage(types.TextMessage(author: _aiAssistant, createdAt: DateTime.now().millisecondsSinceEpoch, id: _randomString(), text: reply));
         return;
       }
 

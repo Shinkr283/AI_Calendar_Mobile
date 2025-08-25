@@ -84,9 +84,6 @@ dependencies:
   # 토스트 메시지
   fluttertoast: ^8.2.8
   
-  # 환경 변수
-  flutter_dotenv: ^5.2.1
-
   # === 구글 로그인 및 파이어베이스 ===
   firebase_core: ^2.24.2
   firebase_auth: ^4.15.3
@@ -159,8 +156,6 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
-    - .env
-
   # 폰트 (나중에 추가할 예정)
   # fonts:
   #   - family: Pretendard

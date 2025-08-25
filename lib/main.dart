@@ -17,7 +17,6 @@ import 'screens/weather_screen.dart'; // Added import for WeatherScreen
 import 'screens/map_screen.dart'; // MapScreen import 추가
 import 'screens/chat_screen.dart';//추가
 import 'screens/settings_screen.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';//추가
 import 'package:intl/date_symbol_data_local.dart';//추가
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
@@ -35,8 +34,6 @@ import 'providers/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // .env 파일 로드
-  await dotenv.load(fileName: ".env");
   // Firebase 초기화
   await Firebase.initializeApp();
   // 한국어 날짜 포맷 초기화

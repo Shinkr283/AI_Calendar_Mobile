@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../config/api_keys.dart';
 
 class GeminiService {
   static final GeminiService _instance = GeminiService._internal();
@@ -16,11 +16,8 @@ class GeminiService {
     required List<Map<String, dynamic>> functionDeclarations,
     List<Map<String, dynamic>> conversationHistory = const [],
   }) async {
-    final apiKey = dotenv.env['GEMINI_API_KEY'];
-    if (apiKey == null) {
-      throw Exception('GEMINI_API_KEY가 설정되지 않았습니다.');
-    }
-
+    final apiKey = ApiKeys.geminiApiKey;
+    
     final url = '$_baseUrl?key=$apiKey';
     
     // 대화 히스토리 구성
@@ -88,10 +85,7 @@ class GeminiService {
     required List<Map<String, dynamic>> functionDeclarations,
     required List<Map<String, dynamic>> conversationHistory,
   }) async {
-    final apiKey = dotenv.env['GEMINI_API_KEY'];
-    if (apiKey == null) {
-      throw Exception('GEMINI_API_KEY가 설정되지 않았습니다.');
-    }
+    final apiKey = ApiKeys.geminiApiKey;
 
     final url = '$_baseUrl?key=$apiKey';
     

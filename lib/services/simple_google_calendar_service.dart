@@ -78,7 +78,6 @@ class SimpleGoogleCalendarService {
                  endTime: localEvent.endTime,
                  alarmMinutesBefore: localEvent.alarmMinutesBefore,
                  location: localEvent.location,
-                 isAllDay: localEvent.isAllDay,
                );
               syncedCount++;
               print('➕ 동기화: ${localEvent.title}');
@@ -130,7 +129,7 @@ class SimpleGoogleCalendarService {
       final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
       
       final eventService = EventService();
-      final localEvents = await eventService.getEventsForDateRange(startOfMonth, endOfMonth);
+      final localEvents = await eventService.getEventsForDate(startOfMonth);
       
       print('📥 우리 앱에서 ${localEvents.length}개 이벤트 가져옴');
       
@@ -152,9 +151,11 @@ class SimpleGoogleCalendarService {
           final createdEvent = await calendarApi.events.insert(googleEvent, 'primary');
           
                      // 로컬 이벤트에 Google Event ID 저장
-           await eventService.updateEventWithGoogleId(
-             localEvent.id,
-             googleEventId: createdEvent.id,
+           await eventService.updateEvent(
+             localEvent.copyWith(
+               googleEventId: createdEvent.id,
+               updatedAt: DateTime.now(),
+             ),
            );
           
           exportedCount++;

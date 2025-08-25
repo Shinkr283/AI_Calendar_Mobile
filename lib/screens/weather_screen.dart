@@ -23,13 +23,24 @@ class _WeatherScreenState extends State<WeatherScreen> {
     setState(() => isLoading = true);
     // 위치 권한 요청 및 현재 위치 받아오기
     LocationPermission permission = await Geolocator.requestPermission();
-    Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high);
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        setState(() => isLoading = false);
+        return;
+      }
+    }
+    if (permission == LocationPermission.deniedForever) {
+      setState(() => isLoading = false);
+      return;
+    }
 
-    // 날씨 정보 받아오기
-    WeatherService weatherService = WeatherService();
-    final data =
-        await weatherService.fetchWeather(position.latitude, position.longitude);
+    final position = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+
+    // 날씨 정보 받아오기 (서비스 사용)
+    final data = await WeatherService().fetchWeather(position.latitude, position.longitude);
 
     setState(() {
       weatherData = data;
@@ -45,6 +56,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
     if (weatherData == null) {
       return const Center(child: Text('날씨 정보를 불러올 수 없습니다.'));
     }
+
     return Scaffold(
       appBar: AppBar(title: const Text('현재 날씨')),
       body: Center(
@@ -73,4 +85,4 @@ class _WeatherScreenState extends State<WeatherScreen> {
       ),
     );
   }
-} 
+}

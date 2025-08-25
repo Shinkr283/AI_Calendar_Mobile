@@ -1,5 +1,4 @@
 import 'package:intl/intl.dart';
-import 'package:flutter_chat_types/flutter_chat_types.dart';
 import 'event_service.dart';
 import 'native_alarm_service.dart';
 import '../models/event.dart';
