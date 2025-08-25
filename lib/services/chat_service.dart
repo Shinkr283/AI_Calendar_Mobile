@@ -118,7 +118,10 @@ class ChatProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
 
   ChatProvider() {
-    _initialize();
+    // 초기화를 지연시켜 앱 로딩 속도 개선
+    Future.delayed(const Duration(milliseconds: 100), () {
+      _initialize();
+    });
   }
 
   // 비동기 초기화

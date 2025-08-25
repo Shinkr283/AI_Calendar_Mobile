@@ -9,11 +9,14 @@ import 'models/user_profile.dart';
 import 'models/chat_message.dart';
 import 'screens/calendar_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'screens/google_login_screen.dart';
+import 'screens/simple_google_login_screen.dart';
+import 'services/simple_google_sign_in_service.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'screens/weather_screen.dart'; // Added import for WeatherScreen
 import 'screens/map_screen.dart'; // MapScreen import 추가
 import 'screens/chat_screen.dart';//추가
+import 'screens/settings_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';//추가
 import 'package:intl/date_symbol_data_local.dart';//추가
 import 'package:permission_handler/permission_handler.dart';
@@ -22,6 +25,7 @@ import 'services/location_service.dart';
 import 'services/native_alarm_service.dart';
 import 'services/holiday_service.dart';
 import 'services/chat_prompt_service.dart';
+import 'providers/theme_provider.dart';
 
 
 // 권한 요청 및 현재 위치 조회
@@ -38,33 +42,12 @@ void main() async {
   // 한국어 날짜 포맷 초기화
   await initializeDateFormatting('ko_KR', null);
 
-  // 알림 권한 요청
-  await _requestNotificationPermission();
-
-  try {
-    final pos = await LocationService().getCurrentPosition(accuracy: LocationAccuracy.high);
-    print('초기 위치: ${pos.latitude}, ${pos.longitude}');
-  } catch (e) {
-    print('초기 위치 확인 실패: $e');
-  }
-
-  // 한국 공휴일 미리 로드 (올해)
-  try {
-    await HolidayService().preloadForYear(DateTime.now().year);
-  } catch (e) {
-    print('공휴일 로드 실패: $e');
-  }
-
-  // MBTI 기반 시스템 프롬프트를 앱 시작 시 미리 생성합니다
-  try {
-    final currentUser = await UserService().getCurrentUser();
-    final mbti = currentUser?.mbtiType ?? 'INFP';
-    PromptService().createSystemPrompt(mbti);
-  } catch (_) {}
+  // 앱 로딩 속도를 위해 일부 초기화를 백그라운드로 이동
+  _initializeBackgroundServices();
     runApp(MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ChatProvider()),
-        
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
       child: const AICalendarApp(),
     ),
@@ -105,61 +88,125 @@ Future<void> _requestNotificationPermission() async {
     print('❌ 알림 권한 확인 중 오류: $e');
   }
 
-  runApp(MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => ChatProvider()),
-        
-      ],
-      child: const AICalendarApp(),
-    ),
-  );// 수정된 코드
+// 중복된 runApp 호출 제거됨
 }
 
-class AICalendarApp extends StatelessWidget {
+/// 백그라운드에서 실행할 초기화 작업들
+void _initializeBackgroundServices() {
+  Future.delayed(const Duration(milliseconds: 500), () async {
+    // 알림 권한 요청
+    await _requestNotificationPermission();
+    
+    // 위치 서비스 초기화
+    try {
+      final pos = await LocationService().getCurrentPosition(accuracy: LocationAccuracy.high);
+      print('초기 위치: ${pos.latitude}, ${pos.longitude}');
+    } catch (e) {
+      print('초기 위치 확인 실패: $e');
+    }
+
+    // 한국 공휴일 미리 로드 (올해)
+    try {
+      await HolidayService().preloadForYear(DateTime.now().year);
+    } catch (e) {
+      print('공휴일 로드 실패: $e');
+    }
+
+    // MBTI 기반 시스템 프롬프트를 앱 시작 시 미리 생성합니다
+    try {
+      final currentUser = await UserService().getCurrentUser();
+      final mbti = currentUser?.mbtiType ?? 'INFP';
+      PromptService().createSystemPrompt(mbti);
+    } catch (_) {}
+  });
+}
+
+class AICalendarApp extends StatefulWidget {
   const AICalendarApp({super.key});
 
   @override
+  State<AICalendarApp> createState() => _AICalendarAppState();
+}
+
+class _AICalendarAppState extends State<AICalendarApp> {
+  @override
+  void initState() {
+    super.initState();
+    // 앱 시작 시 한 번만 테마 로드
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<ThemeProvider>().loadTheme();
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'AI 캘린더',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          centerTitle: true,
-          elevation: 0,
-        ),
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          centerTitle: true,
-          elevation: 0,
-        ),
-      ),
-      debugShowCheckedModeBanner: false,
-      home: StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
-          }
-          if (snapshot.data == null) {
-            return const GoogleLoginScreen();
-          }
-          return const MainScreen();
-        },
-      ),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return MaterialApp(
+          title: 'AI 캘린더',
+          theme: themeProvider.themeData,
+          themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          debugShowCheckedModeBanner: false,
+                          home: FutureBuilder<bool>(
+                  future: _checkLoginStatus(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Scaffold(
+                        body: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircularProgressIndicator(),
+                              SizedBox(height: 16),
+                              Text('앱 초기화 중...'),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+                    if (snapshot.data == true) {
+                      return const MainScreen();
+                    }
+                    return const SimpleGoogleLoginScreen();
+                  },
+                ),
+        );
+      },
     );
+  }
+
+  /// 로그인 상태 확인 및 복원
+  Future<bool> _checkLoginStatus() async {
+    try {
+      // SimpleGoogleSignInService 초기화
+      final signInService = SimpleGoogleSignInService();
+      
+      // SharedPreferences에서 로그인 상태 확인
+      final isSignedIn = await signInService.isSignedIn;
+      
+      if (isSignedIn) {
+        print('📱 저장된 로그인 상태 발견, 백그라운드 복원 시작');
+        // 백그라운드에서 실제 로그인 복원 시도
+        signInService.restoreSignInState().then((user) {
+          if (user != null) {
+            print('✅ 백그라운드 로그인 복원 성공: ${user.email}');
+          } else {
+            print('⚠️ 백그라운드 로그인 복원 실패');
+          }
+        }).catchError((e) {
+          print('❌ 백그라운드 로그인 복원 오류: $e');
+        });
+        
+        return true; // 저장된 상태가 있으면 일단 메인 화면으로
+      }
+      
+      return false; // 로그인 화면으로
+    } catch (e) {
+      print('❌ 로그인 상태 확인 오류: $e');
+      return false;
+    }
   }
 }
 
@@ -177,7 +224,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _screens = [
     const CalendarScreen(),
     const ChatScreen(),
-    const SettingsTabScreen(),
+    const SettingsScreen(),
   ];
 
   @override
@@ -325,136 +372,4 @@ class CalendarTabScreen extends StatelessWidget {
   }
 }
 
-class SettingsTabScreen extends StatelessWidget {
-  const SettingsTabScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('설정'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.bug_report),
-            onPressed: () => _testUserService(context),
-            tooltip: '사용자 서비스 테스트',
-          ),
-        ],
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.settings,
-              size: 64,
-              color: Colors.orange,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              '설정 화면',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              '앱 설정 기능이 여기에 들어갑니다',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              '🐛 우상단 버그 아이콘을 눌러서 사용자 서비스를 테스트해보세요!',
-              style: TextStyle(fontSize: 14, color: Colors.orange),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const WeatherScreen()),
-                );
-              },
-              child: const Text('날씨 정보 보기'),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const MapScreen()),
-                );
-              },
-              child: const Text('내 위치 지도 보기'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _testUserService(BuildContext context) async {
-    try {
-      final userService = UserService();
-      
-      // 테스트 사용자 생성
-      final user = await userService.createUser(
-        name: '테스트 사용자',
-        email: 'test@example.com',
-        mbtiType: 'INTJ',
-      );
-      
-      // MBTI 설정 테스트
-      await userService.setMBTIType('ENFP');
-      
-      // 선호도 설정 테스트
-      await userService.setThemeMode('dark');
-      await userService.setWorkingHours(9, 18);
-      
-      // 현재 사용자 조회
-      final currentUser = await userService.getCurrentUser();
-      
-      if (context.mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('✅ 사용자 서비스 테스트 성공!'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('사용자 이름: ${user.name}'),
-                Text('이메일: ${user.email}'),
-                Text('MBTI: ${currentUser?.mbtiType ?? 'N/A'}'),
-                Text('사용자 ID: ${user.id}'),
-                const SizedBox(height: 8),
-                const Text('사용자 관리 시스템이 정상적으로 작동합니다!'),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('확인'),
-              ),
-            ],
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('❌ 테스트 실패'),
-            content: Text('오류: $e'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('확인'),
-              ),
-            ],
-          ),
-        );
-      }
-    }
-  }
-}
+// 기존 SettingsTabScreen 제거됨 - 새로운 SettingsScreen으로 대체

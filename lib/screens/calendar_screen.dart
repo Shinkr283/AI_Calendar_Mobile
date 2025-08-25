@@ -37,6 +37,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final hasSeenSyncPrompt = prefs.getBool('hasSeenSyncPrompt') ?? false;
     if (!hasSeenSyncPrompt) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
         showDialog(
           context: context,
           barrierDismissible: false,

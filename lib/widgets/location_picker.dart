@@ -274,7 +274,7 @@ class _LocationPickerState extends State<LocationPicker> {
                   }
                 : {},
             myLocationEnabled: true,
-            myLocationButtonEnabled: true,
+            myLocationButtonEnabled: false, // 커스텀 버튼 사용
             zoomControlsEnabled: true,
             mapType: MapType.normal,
             compassEnabled: true,
@@ -486,6 +486,25 @@ class _LocationPickerState extends State<LocationPicker> {
                 ),
               ),
             ),
+          
+          // 📍 우하단 내 위치 버튼
+          Positioned(
+            right: 16,
+            bottom: 100, // 하단 선택 UI와 겹치지 않도록 여유 공간
+            child: FloatingActionButton(
+              mini: true,
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.blue,
+              onPressed: () async {
+                if (_currentLocation != null && _mapController != null) {
+                  await _mapController!.animateCamera(
+                    CameraUpdate.newLatLngZoom(_currentLocation!, 15.0),
+                  );
+                }
+              },
+              child: const Icon(Icons.my_location),
+            ),
+          ),
         ],
       ),
     );
