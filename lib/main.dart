@@ -17,6 +17,7 @@ import 'screens/weather_screen.dart'; // Added import for WeatherScreen
 import 'screens/map_screen.dart'; // MapScreen import 추가
 import 'screens/chat_screen.dart';//추가
 import 'screens/settings_screen.dart';
+import 'screens/home_screen.dart';
 import 'package:intl/date_symbol_data_local.dart';//추가
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
@@ -217,8 +218,9 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   
-  // 각 탭의 화면들 (나중에 실제 화면으로 교체할 예정)
+  // 각 탭의 화면들
   final List<Widget> _screens = [
+    const HomeScreen(),
     const CalendarScreen(),
     const ChatScreen(),
     const SettingsScreen(),
@@ -237,6 +239,10 @@ class _MainScreenState extends State<MainScreen> {
         },
         type: BottomNavigationBarType.fixed,
         items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: '홈',
+          ),
           BottomNavigationBarItem(
             icon: Icon(Icons.calendar_month),
             label: '캘린더',

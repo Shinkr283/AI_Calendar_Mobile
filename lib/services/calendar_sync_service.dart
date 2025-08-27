@@ -153,7 +153,49 @@ class CalendarSyncService {
           continue;
         }
       }
-      continue;
+
+      // 🆕 구글에서 새로 추가된 이벤트를 로컬에 생성
+      if (gId != null && !syncedIds.contains(gId)) {
+        try {
+          final newEvent = Event(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            title: ev.summary ?? '제목 없음',
+            description: ev.description ?? '',
+            startTime: startTime,
+            endTime: endTime,
+            location: ev.location ?? '',
+            googleEventId: gId,
+            isCompleted: false,
+            isAllDay: ev.start?.date != null, // all-day 이벤트 확인
+            alarmMinutesBefore: 10,
+            createdAt: DateTime.now(),
+            updatedAt: ev.updated?.toLocal() ?? DateTime.now(),
+          );
+          
+          final createdEvent = await EventService().createEvent(
+            title: newEvent.title,
+            description: newEvent.description,
+            startTime: newEvent.startTime,
+            endTime: newEvent.endTime,
+            location: newEvent.location,
+            isAllDay: newEvent.isAllDay,
+            alarmMinutesBefore: newEvent.alarmMinutesBefore,
+          );
+          
+          // 생성된 이벤트에 Google Event ID 추가
+          final updatedEvent = createdEvent.copyWith(
+            googleEventId: gId,
+            updatedAt: DateTime.now(),
+          );
+          await EventService().updateEvent(updatedEvent);
+          
+          syncedIds.add(gId);
+          inserted++;
+          print('➕ 구글에서 새 이벤트 생성: ${newEvent.title}');
+        } catch (e) {
+          print('⚠️ 구글 이벤트 생성 실패: ${ev.summary} - $e');
+        }
+      }
     }
 
     await prefs.setStringList('google_synced_event_ids', syncedIds.toList());
