@@ -153,9 +153,6 @@ class CalendarSyncService {
           continue;
         }
       }
-
-      // 변경 동기화 모드에서는 신규 로컬 이벤트를 생성하지 않습니다.
-      // (기존 gid 매칭/수동 매칭된 이벤트만 업데이트)
       continue;
     }
 

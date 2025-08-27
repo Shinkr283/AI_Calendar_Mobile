@@ -70,8 +70,8 @@ class DatabaseTestUtils {
     try {
       print('🧹 테스트 데이터 정리 시작');
       
-      final databaseService = DatabaseService();
-      await databaseService.clearAllTables();
+      // final databaseService = DatabaseService();
+      // await databaseService.clearAllTables();
       
       print('✅ 테스트 데이터 정리 완료');
     } catch (e) {

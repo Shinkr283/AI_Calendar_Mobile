@@ -203,7 +203,7 @@ class SimpleGoogleSignInService {
       await prefs.setString('google_user_email', user.email);
       await prefs.setString('google_user_name', user.displayName ?? '');
       await prefs.setString('google_user_photo', user.photoUrl ?? '');
-      await prefs.setString('google_user_id', user.id);
+      // await prefs.setString('google_user_id', user.id);
       await prefs.setBool('is_google_signed_in', true);
       print('💾 사용자 정보 저장 완료');
     } catch (e) {
@@ -218,7 +218,7 @@ class SimpleGoogleSignInService {
       await prefs.remove('google_user_email');
       await prefs.remove('google_user_name');
       await prefs.remove('google_user_photo');
-      await prefs.remove('google_user_id');
+      // await prefs.remove('google_user_id');
       await prefs.setBool('is_google_signed_in', false);
       print('🗑️ 저장된 사용자 정보 삭제 완료');
     } catch (e) {
@@ -234,7 +234,7 @@ class SimpleGoogleSignInService {
         'email': prefs.getString('google_user_email'),
         'name': prefs.getString('google_user_name'),
         'photo': prefs.getString('google_user_photo'),
-        'id': prefs.getString('google_user_id'),
+        // 'id': prefs.getString('google_user_id'),
       };
     } catch (e) {
       print('⚠️ 사용자 정보 조회 오류: $e');

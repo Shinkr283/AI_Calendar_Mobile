@@ -162,17 +162,86 @@ class ChatProvider with ChangeNotifier {
   // 초기 메시지 로드 (오늘 일정 브리핑)
   Future<void> _loadInitialMessage() async {
     try {
-      // 오늘 일정 브리핑 조회 (BriefingService 내부에서 필요한 데이터 수집)
+      final eventService = EventService();
+      // 오늘 일정 브리핑에서 BriefingService로 처리하므로 todayDate 변수 제거
+
+      // 병렬 로딩 + 타임아웃 적용
+      final eventsFuture = eventService.getTodayEvents();
+      final posFuture = _withTimeout(LocationService().getCurrentPosition(), const Duration(seconds: 2));
+
+      final results = await Future.wait([
+        eventsFuture,
+        posFuture,
+      ], eagerError: false);
+
+      final todayEvents = results[0] as List<Event>;
+      Position? pos = results[1] as Position?;
+      // 위치 타임아웃/실패 시 마지막 위치로 보완 시도
+      pos ??= await _withTimeout(LocationService().getLastKnownPosition(), const Duration(seconds: 1));
+
+      // 위치 / 날씨 / 주소 (위치가 있을 때만, 2초 타임아웃)
+      // String temp = '';
+      // String weatherDesc = '';
+      String address = '';
+      double? lat;
+      double? lon;
+      final prefsWX = await SharedPreferences.getInstance();
+      if (pos != null) {
+        lat = pos.latitude;
+        lon = pos.longitude;
+        address = await _withTimeout(LocationService().getAddressFrom(pos), const Duration(seconds: 2)) ?? '';
+      } else {
+        // 캐시 좌표 사용 시도
+        lat = double.tryParse(prefsWX.getString('last_lat') ?? '');
+        lon = double.tryParse(prefsWX.getString('last_lon') ?? '');
+        address = prefsWX.getString('last_address') ?? '';
+      }
+      // 최종 실패 시 서울 기본값
+      lat ??= 37.5665;
+      lon ??= 126.9780;
+      if (address.isEmpty) address = '서울특별시';
+      final weather = await _withTimeout(WeatherService().fetchWeather(lat, lon), const Duration(seconds: 2));
+      if (weather != null) {
+        // temp = (weather['main']?['temp'] ?? '').toString();
+        // weatherDesc = (weather['weather']?[0]?['description'] ?? '').toString();
+        // 캐시 저장
+        await prefsWX.setString('last_lat', lat.toString());
+        await prefsWX.setString('last_lon', lon.toString());
+        await prefsWX.setString('last_address', address);
+        await prefsWX.setString('last_weather', jsonEncode(weather));
+      } else {
+        // 캐시 날씨 폴백
+        final cached = prefsWX.getString('last_weather');
+        if (cached != null && cached.isNotEmpty) {
+          try {
+          } catch (_) {}
+        }
+      }
+
+      // 일정 리스트 문자열화
+      final eventListBuffer = StringBuffer();
+      if (todayEvents.isEmpty) {
+        eventListBuffer.writeln('- (없음)');
+      } else {
+        todayEvents.sort((a, b) => a.startTime.compareTo(b.startTime));
+        for (final e in todayEvents) {
+          final t = DateFormat('HH:mm').format(e.startTime);
+          eventListBuffer.writeln('- $t: ${e.title}');
+        }
+      }
+
+      // 오늘 일정 브리핑 조회
       final contextPrompt = await BriefingService().getBriefingForDate(DateTime.now());
 
-      // 초기 브리핑은 함수 선언 없이 경량 호출로 속도 최적화
+      // LLM 비동기 생성
       final systemPrompt = _promptService.createSystemPrompt(_currentUserMbti);
+      final functionDeclarations = _getAllFunctionDeclarations();
       final response = await _geminiService.sendMessage(
         message: contextPrompt,
         systemPrompt: systemPrompt,
-        functionDeclarations: const [],
+        functionDeclarations: functionDeclarations,
         conversationHistory: _conversationHistory,
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 20));
       final refined = (response.text ?? '').trim();
       if (refined.isNotEmpty) {
         final msg = types.TextMessage(
@@ -293,11 +362,11 @@ class ChatProvider with ChangeNotifier {
         return;
       }
       // 일정 위치 로컬 처리: 서비스에 위임
-      if (RegExp(r'일정.*(위치|장소)').hasMatch(processedText)) {
-        final reply = await ChatLocationService().getEventLocation();
-        _addMessage(types.TextMessage(author: _aiAssistant, createdAt: DateTime.now().millisecondsSinceEpoch, id: _randomString(), text: reply));
-        return;
-      }
+      // if (RegExp(r'일정.*(위치|장소)').hasMatch(processedText)) {
+      //   final reply = await ChatLocationService().getEventLocation();
+      //   _addMessage(types.TextMessage(author: _aiAssistant, createdAt: DateTime.now().millisecondsSinceEpoch, id: _randomString(), text: reply));
+      //   return;
+      // }
       // 일정 날씨 로컬 처리: 서비스에 위임
       if (RegExp(r'일정.*날씨').hasMatch(processedText)) {
         final res = await _weatherService.handleFunctionCall(GeminiFunctionCall(name: 'getWeatherForTodayEvent', args: {}));

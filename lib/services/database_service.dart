@@ -13,6 +13,17 @@ class DatabaseService {
   
   DatabaseService._internal();
 
+  /// DB 연결 후 작업 실행, 항상 연결 해제
+  Future<T> _withDb<T>(Future<T> Function(Database db) action) async {
+    final db = await database;
+    try {
+      return await action(db);
+    } finally {
+      await db.close();
+      _database = null;
+    }
+  }
+
   Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDatabase();
@@ -29,9 +40,8 @@ class DatabaseService {
 
              final db = await openDatabase(
          path,
-         version: 4, // 버전 업그레이드: isAllDay 필드 추가
+         version: 1,
          onCreate: _createDatabase,
-         onUpgrade: _upgradeDatabase,
        );
       
       print('✅ 데이터베이스 초기화 완료');
@@ -55,10 +65,9 @@ class DatabaseService {
       // 사용자 프로필 테이블
       print('👤 user_profiles 테이블 생성 중...');
       await db.execute('''
-        CREATE TABLE user_profiles (
-          id TEXT PRIMARY KEY,
+        CREATE TABLE IF NOT EXISTS user_profiles (
+          email TEXT NOT NULL PRIMARY KEY,
           name TEXT NOT NULL,
-          email TEXT NOT NULL UNIQUE,
           profileImageUrl TEXT,
           phoneNumber TEXT,
           mbtiType TEXT,
@@ -74,7 +83,7 @@ class DatabaseService {
       // 일정 테이블
       print('📅 events 테이블 생성 중...');
       await db.execute('''
-        CREATE TABLE events (
+        CREATE TABLE IF NOT EXISTS events (
           id TEXT PRIMARY KEY,
           title TEXT NOT NULL,
           description TEXT,
@@ -83,7 +92,7 @@ class DatabaseService {
           location TEXT,
           locationLatitude REAL,
           locationLongitude REAL,
-          googleEventId TEXT,
+          googleEventId TEXT UNIQUE,
           isCompleted INTEGER NOT NULL DEFAULT 0,
           isAllDay INTEGER NOT NULL DEFAULT 0,
           alarmMinutesBefore INTEGER NOT NULL DEFAULT 10,
@@ -96,13 +105,15 @@ class DatabaseService {
       // 채팅 세션 테이블
       print('💬 chat_sessions 테이블 생성 중...');
       await db.execute('''
-        CREATE TABLE chat_sessions (
+        CREATE TABLE IF NOT EXISTS chat_sessions (
           id TEXT PRIMARY KEY,
+          userEmail TEXT NOT NULL,
           title TEXT NOT NULL,
           createdAt INTEGER NOT NULL,
           lastMessageAt INTEGER NOT NULL,
           messageCount INTEGER NOT NULL DEFAULT 0,
-          isActive INTEGER NOT NULL DEFAULT 1
+          isActive INTEGER NOT NULL DEFAULT 1,
+          FOREIGN KEY (userEmail) REFERENCES user_profiles (email) ON DELETE CASCADE
         )
       ''');
       print('✅ chat_sessions 테이블 생성 완료');
@@ -110,9 +121,10 @@ class DatabaseService {
       // 채팅 메시지 테이블
       print('📝 chat_messages 테이블 생성 중...');
       await db.execute('''
-        CREATE TABLE chat_messages (
+        CREATE TABLE IF NOT EXISTS chat_messages (
           id TEXT PRIMARY KEY,
           sessionId TEXT NOT NULL,
+          userEmail TEXT NOT NULL,
           content TEXT NOT NULL,
           type TEXT NOT NULL,
           sender TEXT NOT NULL,
@@ -121,7 +133,8 @@ class DatabaseService {
           parentMessageId TEXT,
           attachments TEXT,
           status TEXT NOT NULL,
-          FOREIGN KEY (sessionId) REFERENCES chat_sessions (id) ON DELETE CASCADE
+          FOREIGN KEY (sessionId) REFERENCES chat_sessions (id) ON DELETE CASCADE,
+          FOREIGN KEY (userEmail) REFERENCES user_profiles (email) ON DELETE CASCADE
         )
       ''');
       print('✅ chat_messages 테이블 생성 완료');
@@ -138,34 +151,6 @@ class DatabaseService {
       print('❌ 테이블 생성 실패: $e');
       print('📍 스택 트레이스: $stackTrace');
       rethrow;
-    }
-  }
-
-  Future<void> _upgradeDatabase(Database db, int oldVersion, int newVersion) async {
-    print('🔄 데이터베이스 업그레이드: $oldVersion → $newVersion');
-    
-    if (oldVersion < 2) {
-      // events 테이블에 googleEventId 컬럼 추가
-      await db.execute('ALTER TABLE events ADD COLUMN googleEventId TEXT');
-      // 버전 2: alarmMinutesBefore 필드 추가
-      print('📅 events 테이블에 alarmMinutesBefore 컬럼 추가 중...');
-      await db.execute('ALTER TABLE events ADD COLUMN alarmMinutesBefore INTEGER NOT NULL DEFAULT 10');
-      print('✅ alarmMinutesBefore 컬럼 추가 완료');
-    }
-    
-    if (oldVersion < 3) {
-      // 버전 3: 장소 좌표 필드 추가
-      print('🗺️ events 테이블에 장소 좌표 컬럼 추가 중...');
-      await db.execute('ALTER TABLE events ADD COLUMN locationLatitude REAL');
-      await db.execute('ALTER TABLE events ADD COLUMN locationLongitude REAL');
-      print('✅ 장소 좌표 컬럼 추가 완료');
-    }
-    
-    if (oldVersion < 4) {
-      // 버전 4: isAllDay 필드 추가
-      print('📅 events 테이블에 isAllDay 컬럼 추가 중...');
-      await db.execute('ALTER TABLE events ADD COLUMN isAllDay INTEGER NOT NULL DEFAULT 0');
-      print('✅ isAllDay 컬럼 추가 완료');
     }
   }
 
@@ -187,23 +172,16 @@ class DatabaseService {
   }
 
   // 사용자 프로필 CRUD
-  Future<int> insertUserProfile(UserProfile profile) async {
-    final db = await database;
-    return await db.insert('user_profiles', profile.toMap());
+  Future<int> insertUserProfile(UserProfile profile) {
+    return _withDb<int>((db) => db.insert('user_profiles', profile.toMap()));
   }
 
-  Future<UserProfile?> getUserProfile(String id) async {
-    final db = await database;
-    final maps = await db.query(
-      'user_profiles',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-    
-    if (maps.isNotEmpty) {
-      return UserProfile.fromMap(maps.first);
-    }
-    return null;
+  Future<UserProfile?> getUserProfile(String id) {
+    return _withDb<UserProfile?>((db) async {
+      final maps = await db.query('user_profiles', where: 'id = ?', whereArgs: [id]);
+      if (maps.isNotEmpty) return UserProfile.fromMap(maps.first);
+      return null;
+    });
   }
 
   Future<UserProfile?> getUserProfileByEmail(String email) async {
@@ -234,71 +212,36 @@ class DatabaseService {
     return null;
   }
 
-  Future<int> updateUserProfile(UserProfile profile) async {
-    final db = await database;
-    return await db.update(
-      'user_profiles',
-      profile.toMap(),
-      where: 'id = ?',
-      whereArgs: [profile.id],
-    );
+  Future<int> updateUserProfile(UserProfile profile) {
+    return _withDb<int>((db) async {
+      // 기존 데이터 조회 및 비교 로직
+      final maps = await db.query('user_profiles', where: 'email = ?', whereArgs: [profile.email]);
+      if (maps.isEmpty) return db.insert('user_profiles', profile.toMap());
+      final existing = maps.first;
+      final existingUpdatedAt = DateTime.fromMillisecondsSinceEpoch(existing['updatedAt'] as int);
+      final existingCreatedAt = DateTime.fromMillisecondsSinceEpoch(existing['createdAt'] as int);
+      if (profile.updatedAt.isAfter(existingUpdatedAt) || profile.createdAt.isAfter(existingCreatedAt)) {
+        return db.update('user_profiles', profile.toMap(), where: 'email = ?', whereArgs: [profile.email]);
+      }
+      return 0;
+    });
   }
 
-  Future<int> deleteUserProfile(String id) async {
-    final db = await database;
-    return await db.delete(
-      'user_profiles',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+  Future<int> deleteUserProfile(String email) {
+    return _withDb<int>((db) => db.delete('user_profiles', where: 'email = ?', whereArgs: [email]));
   }
 
   // 일정 CRUD
-  Future<int> insertEvent(Event event) async {
-    try {
-      print('🗄️ DatabaseService: 이벤트 삽입 시작');
-      print('📋 이벤트 데이터: ${event.toMap()}');
-      
-      final db = await database;
-      print('✅ 데이터베이스 연결 성공');
-      
-      final result = await db.insert('events', event.toMap());
-      print('💾 이벤트 삽입 성공: result = $result');
-      
-      // 삽입 후 검증
-      final inserted = await db.query('events', where: 'id = ?', whereArgs: [event.id]);
-      print('🔍 삽입된 데이터 검증: ${inserted.length}개 발견');
-      
-      return result;
-    } catch (e, stackTrace) {
-      print('❌ DatabaseService.insertEvent 실패: $e');
-      print('📍 스택 트레이스: $stackTrace');
-      
-      // 데이터베이스 테이블 상태 확인
-      try {
-        final db = await database;
-        final tableInfo = await db.rawQuery("PRAGMA table_info(events)");
-        print('📊 events 테이블 구조: $tableInfo');
-      } catch (tableError) {
-        print('⚠️ 테이블 정보 조회 실패: $tableError');
-      }
-      
-      rethrow;
-    }
+  Future<int> insertEvent(Event event) {
+    return _withDb<int>((db) => db.insert('events', event.toMap()));
   }
 
-  Future<Event?> getEvent(String id) async {
-    final db = await database;
-    final maps = await db.query(
-      'events',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-    
-    if (maps.isNotEmpty) {
-      return Event.fromMap(maps.first);
-    }
-    return null;
+  Future<Event?> getEvent(String id) {
+    return _withDb<Event?>((db) async {
+      final maps = await db.query('events', where: 'id = ?', whereArgs: [id]);
+      if (maps.isNotEmpty) return Event.fromMap(maps.first);
+      return null;
+    });
   }
 
   Future<List<Event>> getEvents({
@@ -355,12 +298,6 @@ class DatabaseService {
   }
 
   Future<List<Event>> getEventsForDate(DateTime date) async {
-    // final startOfDay = DateTime(date.year, date.month, date.day);
-    // final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
-    
-    // return await getEvents(
-    //   startDate: startOfDay,
-    //   endDate: endOfDay,
   
     // 하루와 "겹치는" 모든 일정 반환: (endTime >= startOfDay) AND (startTime <= endOfDay)
     final db = await database;
@@ -393,43 +330,40 @@ class DatabaseService {
     return 0;
   }
 
-  Future<int> updateEvent(Event event) async {
-    final db = await database;
-    return await db.update(
-      'events',
-      event.toMap(),
-      where: 'id = ?',
-      whereArgs: [event.id],
-    );
+  Future<int> updateEvent(Event event) {
+    return _withDb<int>((db) async {
+      // 기존 데이터 조회 및 비교
+      final maps = await db.query('events', where: 'id = ?', whereArgs: [event.id]);
+      if (maps.isEmpty) return db.insert('events', event.toMap());
+      final existing = maps.first;
+      final existingUpdatedAt = DateTime.fromMillisecondsSinceEpoch(existing['updatedAt'] as int);
+      final existingCreatedAt = DateTime.fromMillisecondsSinceEpoch(existing['createdAt'] as int);
+      final existingGoogleId = existing['googleEventId'] as String?;
+      if (event.googleEventId != null && (existingGoogleId == null || existingGoogleId.isEmpty)) {
+        return db.update('events', event.toMap(), where: 'id = ?', whereArgs: [event.id]);
+      }
+      if (event.updatedAt.isAfter(existingUpdatedAt) || event.createdAt.isAfter(existingCreatedAt)) {
+        return db.update('events', event.toMap(), where: 'id = ?', whereArgs: [event.id]);
+      }
+      return 0;
+    });
   }
 
-  Future<int> deleteEvent(String id) async {
-    final db = await database;
-    return await db.delete(
-      'events',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+  Future<int> deleteEvent(String id) {
+    return _withDb<int>((db) => db.delete('events', where: 'id = ?', whereArgs: [id]));
   }
 
   // 채팅 세션 CRUD
-  Future<int> insertChatSession(ChatSession session) async {
-    final db = await database;
-    return await db.insert('chat_sessions', session.toMap());
+  Future<int> insertChatSession(ChatSession session) {
+    return _withDb<int>((db) => db.insert('chat_sessions', session.toMap()));
   }
 
-  Future<ChatSession?> getChatSession(String id) async {
-    final db = await database;
-    final maps = await db.query(
-      'chat_sessions',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-    
-    if (maps.isNotEmpty) {
-      return ChatSession.fromMap(maps.first);
-    }
-    return null;
+  Future<ChatSession?> getChatSession(String id) {
+    return _withDb<ChatSession?>((db) async {
+      final maps = await db.query('chat_sessions', where: 'id = ?', whereArgs: [id]);
+      if (maps.isNotEmpty) return ChatSession.fromMap(maps.first);
+      return null;
+    });
   }
 
   Future<List<ChatSession>> getChatSessions() async {
@@ -442,63 +376,35 @@ class DatabaseService {
     return maps.map((map) => ChatSession.fromMap(map)).toList();
   }
 
-  Future<int> updateChatSession(ChatSession session) async {
-    final db = await database;
-    return await db.update(
-      'chat_sessions',
-      session.toMap(),
-      where: 'id = ?',
-      whereArgs: [session.id],
-    );
+  Future<int> updateChatSession(ChatSession session) {
+    return _withDb<int>((db) => db.update('chat_sessions', session.toMap(), where: 'id = ?', whereArgs: [session.id]));
   }
 
-  Future<int> deleteChatSession(String id) async {
-    final db = await database;
-    return await db.delete(
-      'chat_sessions',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+  Future<int> deleteChatSession(String id) {
+    return _withDb<int>((db) => db.delete('chat_sessions', where: 'id = ?', whereArgs: [id]));
   }
 
   // 채팅 메시지 CRUD
-  Future<int> insertChatMessage(ChatMessage message, String sessionId) async {
-    final db = await database;
-    final messageMap = message.toMap();
-    messageMap['sessionId'] = sessionId;
-    return await db.insert('chat_messages', messageMap);
+  Future<int> insertChatMessage(ChatMessage message, String sessionId) {
+    return _withDb<int>((db) {
+      final map = message.toMap()..['sessionId'] = sessionId;
+      return db.insert('chat_messages', map);
+    });
   }
 
-  Future<List<ChatMessage>> getChatMessages(String sessionId, {int? limit}) async {
-    final db = await database;
-    final maps = await db.query(
-      'chat_messages',
-      where: 'sessionId = ?',
-      whereArgs: [sessionId],
-      orderBy: 'timestamp DESC',
-      limit: limit,
-    );
-    
-    return maps.map((map) => ChatMessage.fromMap(map)).toList();
+  Future<List<ChatMessage>> getChatMessages(String sessionId, {int? limit}) {
+    return _withDb<List<ChatMessage>>((db) async {
+      final maps = await db.query('chat_messages', where: 'sessionId = ?', whereArgs: [sessionId], orderBy: 'timestamp DESC', limit: limit);
+      return maps.map((m) => ChatMessage.fromMap(m)).toList();
+    });
   }
 
-  Future<int> updateChatMessage(ChatMessage message) async {
-    final db = await database;
-    return await db.update(
-      'chat_messages',
-      message.toMap(),
-      where: 'id = ?',
-      whereArgs: [message.id],
-    );
+  Future<int> updateChatMessage(ChatMessage message) {
+    return _withDb<int>((db) => db.update('chat_messages', message.toMap(), where: 'id = ?', whereArgs: [message.id]));
   }
 
-  Future<int> deleteChatMessage(String id) async {
-    final db = await database;
-    return await db.delete(
-      'chat_messages',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+  Future<int> deleteChatMessage(String id) {
+    return _withDb<int>((db) => db.delete('chat_messages', where: 'id = ?', whereArgs: [id]));
   }
 
   // 통계 및 유틸리티 메서드

@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:math';
+// import 'dart:math';
 import '../models/user_profile.dart';
 import '../models/chat_mbti.dart';
 import 'database_service.dart';
@@ -17,8 +17,8 @@ class UserService {
 
   // 사용자 생성
   Future<UserProfile> createUser({
-    required String name,
     required String email,
+    required String name,
     String? profileImageUrl,
     String? phoneNumber,
     String? mbtiType,
@@ -27,9 +27,8 @@ class UserService {
     String language = 'ko',
   }) async {
     final user = UserProfile(
-      id: _generateUserId(),
-      name: name,
       email: email,
+      name: name,
       profileImageUrl: profileImageUrl,
       phoneNumber: phoneNumber,
       mbtiType: mbtiType,
@@ -45,10 +44,10 @@ class UserService {
     return user;
   }
 
-  // 사용자 조회
-  Future<UserProfile?> getUser(String id) async {
-    return await _databaseService.getUserProfile(id);
-  }
+  // // 사용자 조회
+  // Future<UserProfile?> getUser(String id) async {
+  //   return await _databaseService.getUserProfile(id);
+  // }
 
   // 이메일로 사용자 조회
   Future<UserProfile?> getUserByEmail(String email) async {
@@ -74,7 +73,7 @@ class UserService {
     );
     await _databaseService.updateUserProfile(updatedUser);
     
-    if (_currentUser?.id == user.id) {
+    if (_currentUser?.email == user.email) {
       _currentUser = updatedUser;
     }
     
@@ -82,10 +81,10 @@ class UserService {
   }
 
   // 사용자 삭제
-  Future<bool> deleteUser(String id) async {
-    final result = await _databaseService.deleteUserProfile(id);
+  Future<bool> deleteUser(String email) async {
+    final result = await _databaseService.deleteUserProfile(email);
     
-    if (_currentUser?.id == id) {
+    if (_currentUser?.email == email) {
       _currentUser = null;
     }
     
@@ -276,11 +275,11 @@ class UserService {
   }
 
   // 유니크 ID 생성
-  String _generateUserId() {
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final random = Random().nextInt(10000);
-    return 'user_${timestamp}_$random';
-  }
+  // String _generateUserId() {
+  //   final timestamp = DateTime.now().millisecondsSinceEpoch;
+  //   final random = Random().nextInt(10000);
+  //   return 'user_${timestamp}_$random';
+  // }
 
   // 현재 사용자 설정 (로그인 시 사용)
   void setCurrentUser(UserProfile user) {

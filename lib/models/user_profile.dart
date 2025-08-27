@@ -6,9 +6,8 @@ part 'user_profile.g.dart';
 @JsonSerializable()
 @immutable
 class UserProfile {
-  final String id;
-  final String name;
   final String email;
+  final String name;
   final String? profileImageUrl;
   final String? phoneNumber;
   final String? mbtiType; // MBTI 성격 유형
@@ -19,9 +18,8 @@ class UserProfile {
   final DateTime updatedAt;
 
   const UserProfile({
-    required this.id,
-    required this.name,
     required this.email,
+    required this.name,
     this.profileImageUrl,
     this.phoneNumber,
     this.mbtiType,
@@ -39,9 +37,8 @@ class UserProfile {
   // 데이터베이스용 Map 변환
   Map<String, dynamic> toMap() {
     return {
-      'id': id,
-      'name': name,
       'email': email,
+      'name': name,
       'profileImageUrl': profileImageUrl,
       'phoneNumber': phoneNumber,
       'mbtiType': mbtiType,
@@ -63,9 +60,8 @@ class UserProfile {
     }
 
     return UserProfile(
-      id: map['id'] as String,
-      name: map['name'] as String,
       email: map['email'] as String,
+      name: map['name'] as String,
       profileImageUrl: map['profileImageUrl'] as String?,
       phoneNumber: map['phoneNumber'] as String?,
       mbtiType: map['mbtiType'] as String?,
@@ -79,9 +75,8 @@ class UserProfile {
 
   // 객체 복사 (수정 시 사용)
   UserProfile copyWith({
-    String? id,
-    String? name,
     String? email,
+    String? name,
     String? profileImageUrl,
     String? phoneNumber,
     String? mbtiType,
@@ -92,9 +87,8 @@ class UserProfile {
     DateTime? updatedAt,
   }) {
     return UserProfile(
-      id: id ?? this.id,
-      name: name ?? this.name,
       email: email ?? this.email,
+      name: name ?? this.name,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       mbtiType: mbtiType ?? this.mbtiType,
@@ -108,17 +102,17 @@ class UserProfile {
 
   @override
   String toString() {
-    return 'UserProfile(id: $id, name: $name, email: $email, mbtiType: $mbtiType)';
+    return 'UserProfile(email: $email, name: $name, mbtiType: $mbtiType)';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is UserProfile && other.id == id;
+    return other is UserProfile && other.email == email;
   }
 
   @override
-  int get hashCode => id.hashCode;
+  int get hashCode => email.hashCode;
 }
 
 /// 사용자 선호도 설정을 관리하는 클래스
