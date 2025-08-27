@@ -27,7 +27,7 @@ class CalendarSyncService {
     return auth.accessToken;
   }
 
-  Future<int> syncCurrentMonth({bool readonly = true}) async {
+  Future<int> syncCurrentMonth({bool readonly = false}) async {
     final now = DateTime.now();
     final start = DateTime(now.year, now.month, 1);
     final end = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
@@ -37,7 +37,7 @@ class CalendarSyncService {
   Future<int> syncRange({
     required DateTime start,
     required DateTime end,
-    bool readonly = true,
+    bool readonly = false,
   }) async {
     final token = await _ensureAccessToken(readonly: readonly);
     if (token == null || token.isEmpty) {
@@ -46,7 +46,11 @@ class CalendarSyncService {
 
     final svc = GoogleCalendarService(token);
     late final List<calendar.Event> items;
+    final prefs = await SharedPreferences.getInstance();
     try {
+      // 마지막 동기화 기준 필터(선택): updatedMin
+      final lastUpdatedMs = prefs.getInt('google_last_sync_updated_ms') ?? 0;
+      final updatedMin = lastUpdatedMs > 0 ? DateTime.fromMillisecondsSinceEpoch(lastUpdatedMs) : null;
       items = await svc.fetchEventsInRange(
         timeMin: start,
         timeMax: end,
@@ -54,6 +58,8 @@ class CalendarSyncService {
         orderBy: 'startTime',
         timeZone: 'Asia/Seoul',
         showDeleted: true,
+        updatedMin: updatedMin,
+        fields: 'items(id,status,summary,description,location,updated,start,end),nextPageToken'
       );
     } catch (e) {
       // 401 대응: 재인증 후 1회 재시도
@@ -67,10 +73,11 @@ class CalendarSyncService {
         orderBy: 'startTime',
         timeZone: 'Asia/Seoul',
         showDeleted: true,
+        fields: 'items(id,status,summary,description,location,updated,start,end),nextPageToken'
       );
     }
 
-    final prefs = await SharedPreferences.getInstance();
+    // prefs 이미 로드됨
     final syncedIds = prefs.getStringList('google_synced_event_ids')?.toSet() ?? <String>{};
     // 삭제 대기 큐 처리(로컬에서 삭제된 건을 구글에서도 삭제)
     if (!readonly) {
@@ -90,6 +97,18 @@ class CalendarSyncService {
 
     var inserted = 0;
     var pushed = 0;
+
+    // ---- DB I/O 줄이기: 로컬 이벤트 선로드/맵화 ----
+    // 기간 내 로컬 이벤트를 미리 한꺼번에 로드하여 googleEventId 및 (title,start) 기준으로 맵 구성
+    final localEventsInRange = await EventService().getEvents(startDate: start, endDate: end);
+    final Map<String, Event> localByGid = {
+      for (final e in localEventsInRange)
+        if (e.googleEventId != null && e.googleEventId!.isNotEmpty) e.googleEventId!: e
+    };
+    final Map<String, Event> localByTitleStartKey = {
+      for (final e in localEventsInRange)
+        '${e.title.toLowerCase()}|${e.startTime.millisecondsSinceEpoch}': e
+    };
     for (final ev in items) {
       final startTime = ev.start?.dateTime ?? ev.start?.date?.toLocal();
       final endTime = ev.end?.dateTime ?? ev.end?.date?.toLocal();
@@ -103,14 +122,15 @@ class CalendarSyncService {
             syncedIds.remove(gId);
           }
         }
+        // 취소된 이벤트는 삽입/업데이트 대상이 아님
         continue;
       }
 
       if (startTime == null || endTime == null) continue;
 
-      // Google ID로 로컬 이벤트 매칭 후 최신 정보로 업데이트
+      // Google ID로 로컬 이벤트 매칭 후 최신 정보로 업데이트 (선로드 맵 사용)
       if (gId != null) {
-        final local = await EventService().getEventByGoogleId(gId);
+        final local = localByGid[gId];
         if (local != null) {
           // 구글/로컬 중 더 최신의 수정본을 채택
           final googleUpdated = ev.updated?.toLocal();
@@ -134,15 +154,9 @@ class CalendarSyncService {
           syncedIds.add(gId);
           continue;
         }
-        // 수동 생성된 로컬 이벤트 매칭 (제목 및 시작 시간 기준)
-        final dateEvents = await EventService().getEventsForDate(startTime);
-        Event? manualMatch;
-        for (final e2 in dateEvents) {
-          if (e2.title == (ev.summary ?? e2.title) && e2.startTime == startTime) {
-            manualMatch = e2;
-            break;
-          }
-        }
+        // 수동 생성된 로컬 이벤트 매칭 (제목 및 시작 시간 기준) - 선계산 맵 사용
+        final manualKey = '${(ev.summary ?? '').toLowerCase()}|${startTime.millisecondsSinceEpoch}';
+        final manualMatch = localByTitleStartKey[manualKey];
         if (manualMatch != null) {
           final updatedLocal = manualMatch.copyWith(
             googleEventId: gId,
@@ -150,55 +164,37 @@ class CalendarSyncService {
           );
           await EventService().updateEvent(updatedLocal);
           syncedIds.add(gId);
+          // 맵 갱신
+          localByGid[gId] = updatedLocal;
           continue;
         }
+        // 로컬에 해당 Google 이벤트가 없으면 새로 삽입
+        final createdLocal = await EventService().createEvent(
+          title: ev.summary ?? '(제목 없음)',
+          description: ev.description ?? '',
+          startTime: startTime,
+          endTime: endTime,
+          location: ev.location ?? '',
+          alarmMinutesBefore: 10,
+          isAllDay: ev.start?.dateTime == null && ev.start?.date != null,
+        );
+        final bound = createdLocal.copyWith(
+          googleEventId: gId,
+          updatedAt: DateTime.now(),
+        );
+        await EventService().updateEvent(bound);
+        syncedIds.add(gId);
+        // 맵 갱신
+        localByGid[gId] = bound;
+        localByTitleStartKey['${bound.title.toLowerCase()}|${bound.startTime.millisecondsSinceEpoch}'] = bound;
+        inserted++;
       }
-
-      // 🆕 구글에서 새로 추가된 이벤트를 로컬에 생성
-      if (gId != null && !syncedIds.contains(gId)) {
-        try {
-          final newEvent = Event(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
-            title: ev.summary ?? '제목 없음',
-            description: ev.description ?? '',
-            startTime: startTime,
-            endTime: endTime,
-            location: ev.location ?? '',
-            googleEventId: gId,
-            isCompleted: false,
-            isAllDay: ev.start?.date != null, // all-day 이벤트 확인
-            alarmMinutesBefore: 10,
-            createdAt: DateTime.now(),
-            updatedAt: ev.updated?.toLocal() ?? DateTime.now(),
-          );
-          
-          final createdEvent = await EventService().createEvent(
-            title: newEvent.title,
-            description: newEvent.description,
-            startTime: newEvent.startTime,
-            endTime: newEvent.endTime,
-            location: newEvent.location,
-            isAllDay: newEvent.isAllDay,
-            alarmMinutesBefore: newEvent.alarmMinutesBefore,
-          );
-          
-          // 생성된 이벤트에 Google Event ID 추가
-          final updatedEvent = createdEvent.copyWith(
-            googleEventId: gId,
-            updatedAt: DateTime.now(),
-          );
-          await EventService().updateEvent(updatedEvent);
-          
-          syncedIds.add(gId);
-          inserted++;
-          print('➕ 구글에서 새 이벤트 생성: ${newEvent.title}');
-        } catch (e) {
-          print('⚠️ 구글 이벤트 생성 실패: ${ev.summary} - $e');
-        }
-      }
+      continue;
     }
 
     await prefs.setStringList('google_synced_event_ids', syncedIds.toList());
+    // 마지막 동기화 시간 갱신(현재 시각 기준)
+    await prefs.setInt('google_last_sync_updated_ms', DateTime.now().millisecondsSinceEpoch);
     // ---- Push local changes to Google when not readonly ----
     if (!readonly) {
       final localEvents = await EventService().getEvents(
