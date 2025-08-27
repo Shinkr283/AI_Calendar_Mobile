@@ -81,7 +81,7 @@ class _EventFormState extends State<EventForm> {
   }
 
   // 🔍 장소 이름으로 검색해서 좌표 찾기
-  void _searchAndSetInitialPlace(String placeName) async {
+  Future<void> _searchAndSetInitialPlace(String placeName) async {
     try {
       print('🔍 장소 검색 시작: $placeName');
       final places = await PlacesService.searchPlaces(placeName);
@@ -142,12 +142,30 @@ class _EventFormState extends State<EventForm> {
   }
 
   void _pickLocation() async {
+    print('🗺️ LocationPicker 호출 - 기존 장소: ${_selectedPlace?.name ?? "없음"}');
+    if (_selectedPlace != null) {
+      print('📍 기존 장소 좌표: (${_selectedPlace!.latitude}, ${_selectedPlace!.longitude})');
+    }
+    
+    // 🚨 기존 장소가 아직 설정되지 않았지만 위치 텍스트가 있는 경우 즉시 검색
+    if (_selectedPlace == null && _location.isNotEmpty) {
+      print('⚠️ 기존 장소가 아직 설정되지 않음, 즉시 검색 수행: $_location');
+      await _searchAndSetInitialPlace(_location);
+    }
+    
+    // 🚨 좌표가 0인 경우 다시 검색 (비동기 처리로 인한 타이밍 문제 해결)
+    if (_selectedPlace != null && _selectedPlace!.latitude == 0 && _selectedPlace!.longitude == 0 && _location.isNotEmpty) {
+      print('⚠️ 좌표가 0인 경우 재검색 수행: $_location');
+      await _searchAndSetInitialPlace(_location);
+    }
+    
     final result = await Navigator.of(context).push<PlaceDetails>(
       MaterialPageRoute(
         builder: (context) => LocationPicker(
           initialLocation: _location,
           initialPlace: _selectedPlace,
           onLocationSelected: (place) {
+            print('✅ LocationPicker에서 장소 선택됨: ${place.name}');
             setState(() {
               _selectedPlace = place;
               _location = place.name;
@@ -158,10 +176,13 @@ class _EventFormState extends State<EventForm> {
     );
     
     if (result != null) {
+      print('✅ LocationPicker 결과 수신: ${result.name}');
       setState(() {
         _selectedPlace = result;
         _location = result.name;
       });
+    } else {
+      print('❌ LocationPicker에서 장소 선택 취소됨');
     }
   }
 

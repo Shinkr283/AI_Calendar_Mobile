@@ -35,6 +35,7 @@ class _MapScreenState extends State<MapScreen> {
       _currentLatLng = LatLng(widget.initialLat!, widget.initialLon!);
       _address = widget.initialAddress ?? '';
     } else {
+      // GPS 위치 획득 시도 (실패해도 기본 위치 사용)
       _getCurrentLocation();
     }
   }
@@ -48,18 +49,58 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _getCurrentLocation() async {
     try {
-    LocationPermission permission = await Geolocator.requestPermission();
-    Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high);
-    setState(() {
-      _currentLatLng = LatLng(position.latitude, position.longitude);
-      _address = ''; // 기기 위치 사용시 주소는 따로 설정되지 않음
-    });
-    _mapController?.animateCamera(
-      CameraUpdate.newLatLng(_currentLatLng!),
-    );
+      // 위치 권한 확인
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          print('위치 권한이 거부되었습니다.');
+          // 권한이 거부되어도 기본 위치 사용
+          if (mounted) {
+            setState(() {
+              _currentLatLng = const LatLng(37.5665, 126.9780); // 서울 기본 위치
+            });
+          }
+          return;
+        }
+      }
+      
+      if (permission == LocationPermission.deniedForever) {
+        print('위치 권한이 영구적으로 거부되었습니다.');
+        // 권한이 영구 거부되어도 기본 위치 사용
+        if (mounted) {
+          setState(() {
+            _currentLatLng = const LatLng(37.5665, 126.9780); // 서울 기본 위치
+          });
+        }
+        return;
+      }
+      
+      // 위치 획득 시도
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10), // 10초 타임아웃
+      );
+      
+      if (mounted) {
+        setState(() {
+          _currentLatLng = LatLng(position.latitude, position.longitude);
+          _address = ''; // 기기 위치 사용시 주소는 따로 설정되지 않음
+        });
+        
+        // 지도 컨트롤러가 준비되면 이동
+        _mapController?.animateCamera(
+          CameraUpdate.newLatLng(_currentLatLng!),
+        );
+      }
     } catch (e) {
       print('위치 가져오기 실패: $e');
+      // 실패 시 기본 위치 사용
+      if (mounted) {
+        setState(() {
+          _currentLatLng = const LatLng(37.5665, 126.9780); // 서울 기본 위치
+        });
+      }
     }
   }
 
@@ -159,22 +200,31 @@ class _MapScreenState extends State<MapScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('위치 지도')),
       body: _currentLatLng == null
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('위치 정보를 가져오는 중...'),
+                ],
+              ),
+            )
           : Stack(
               children: [
                 // 🗺️ 전체 화면 지도
                 GoogleMap(
-              initialCameraPosition: CameraPosition(
-                target: _currentLatLng!,
-                zoom: 15,
-              ),
-              myLocationEnabled: true,
+                  initialCameraPosition: CameraPosition(
+                    target: _currentLatLng!,
+                    zoom: 15,
+                  ),
+                  myLocationEnabled: true,
                   myLocationButtonEnabled: false, // 기본 버튼 비활성화
-              onMapCreated: (controller) => _mapController = controller,
-              markers: {
-                Marker(
+                  onMapCreated: (controller) => _mapController = controller,
+                  markers: {
+                    Marker(
                       markerId: const MarkerId('selected_location'),
-                  position: _currentLatLng!,
+                      position: _currentLatLng!,
                       icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
                       infoWindow: InfoWindow(
                         title: _selectedPlace?.mainText ?? '선택된 위치',
@@ -182,7 +232,7 @@ class _MapScreenState extends State<MapScreen> {
                       ),
                     ),
                   },
-                  zoomControlsEnabled: true,
+                  zoomControlsEnabled: false, // 기본 확대/축소 컨트롤 비활성화
                   mapType: MapType.normal,
                   compassEnabled: true,
                   tiltGesturesEnabled: true,
@@ -193,37 +243,68 @@ class _MapScreenState extends State<MapScreen> {
                   buildingsEnabled: true,
                 ),
                 
-                // 📍 우하단 내 위치 버튼 (확대/축소 버튼 위쪽에 위치)
+                // 🔍 커스텀 확대/축소 컨트롤
                 Positioned(
                   right: 16,
-                  bottom: 100, // 확대/축소 버튼과 겹치지 않도록 여유 공간
-                  child: FloatingActionButton(
-                    mini: true,
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.blue,
-                    onPressed: () async {
-                      try {
-                        Position position = await Geolocator.getCurrentPosition(
-                          desiredAccuracy: LocationAccuracy.high
-                        );
-                        final newLocation = LatLng(position.latitude, position.longitude);
-                        
-                        setState(() {
-                          _currentLatLng = newLocation;
-                          _address = '';
-                          _selectedPlace = null;
-                          _searchController.text = '';
-                          _suggestions = [];
-                        });
-                        
-                        _mapController?.animateCamera(
-                          CameraUpdate.newLatLngZoom(newLocation, 15.0),
-                        );
-                      } catch (e) {
-                        print('현재 위치 가져오기 실패: $e');
-                      }
-                    },
-                    child: const Icon(Icons.my_location),
+                  bottom: 80, // 우하단에 위치
+                  child: Column(
+                    children: [
+                      // 확대 버튼
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(50),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.add, color: Colors.blue),
+                          onPressed: () {
+                            _mapController?.animateCamera(
+                              CameraUpdate.zoomIn(),
+                            );
+                          },
+                          padding: const EdgeInsets.all(12),
+                          constraints: const BoxConstraints(
+                            minWidth: 48,
+                            minHeight: 48,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // 축소 버튼
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(50),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.remove, color: Colors.blue),
+                          onPressed: () {
+                            _mapController?.animateCamera(
+                              CameraUpdate.zoomOut(),
+                            );
+                          },
+                          padding: const EdgeInsets.all(12),
+                          constraints: const BoxConstraints(
+                            minWidth: 48,
+                            minHeight: 48,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 
@@ -306,7 +387,7 @@ class _MapScreenState extends State<MapScreen> {
                               final suggestion = _suggestions[index];
                               return ListTile(
                                 dense: true,
-                                                                 leading: const Icon(Icons.location_on, color: Colors.red, size: 20),
+                                leading: const Icon(Icons.location_on, color: Colors.red, size: 20),
                                 title: Text(
                                   suggestion.mainText,
                                   style: const TextStyle(fontWeight: FontWeight.w500),
@@ -331,8 +412,57 @@ class _MapScreenState extends State<MapScreen> {
                     ],
                   ),
                 ),
+                
+                // 📍 검색 바 오른쪽 아래 내 위치 버튼
+                Positioned(
+                  right: 16,
+                  top: 80, // 검색 바 아래에 위치
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(50),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.my_location, color: Colors.blue),
+                      onPressed: () async {
+                        try {
+                          Position position = await Geolocator.getCurrentPosition(
+                            desiredAccuracy: LocationAccuracy.high
+                          );
+                          final newLocation = LatLng(position.latitude, position.longitude);
+                          
+                          setState(() {
+                            _currentLatLng = newLocation;
+                            _address = '';
+                            _selectedPlace = null;
+                            _searchController.text = '';
+                            _suggestions = [];
+                          });
+                          
+                          _mapController?.animateCamera(
+                            CameraUpdate.newLatLngZoom(newLocation, 15.0),
+                          );
+                        } catch (e) {
+                          print('현재 위치 가져오기 실패: $e');
+                        }
+                      },
+                      padding: const EdgeInsets.all(12),
+                      constraints: const BoxConstraints(
+                        minWidth: 48,
+                        minHeight: 48,
+                      ),
+                    ),
+                  ),
+                ),
               ],
-      ),
+            ),
     );
   }
 } 
