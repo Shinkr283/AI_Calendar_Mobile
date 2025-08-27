@@ -37,14 +37,11 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      // 날씨 정보 로드
-      await _loadWeatherData();
+      // 날씨 정보 로드 (빠른 로딩)
+      _loadWeatherData();
       
-      // 오늘 일정 로드
-      await _loadTodayEvents();
-      
-      // AI 추천 로드
-      await _loadAiRecommendation();
+      // 오늘 일정 로드 (빠른 로딩)
+      _loadTodayEvents();
       
     } catch (e) {
       print('홈 데이터 로드 실패: $e');
@@ -55,6 +52,9 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     }
+    
+    // AI 추천은 별도로 비동기 로드 (화면이 먼저 표시된 후)
+    _loadAiRecommendation();
   }
 
   Future<void> _loadWeatherData() async {
@@ -340,25 +340,52 @@ $eventSummary
                 ),
                 const Spacer(),
                 if (_isAiLoading)
-                  const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'AI 분석 중...',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
                   ),
               ],
             ),
             const SizedBox(height: 16),
             if (_aiRecommendation == null)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Text(
-                    'AI 추천을 불러오는 중...',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey,
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'AI가 오늘 일정을 분석하고 있습니다...',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               )
             else

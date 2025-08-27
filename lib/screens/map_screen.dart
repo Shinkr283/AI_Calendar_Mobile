@@ -175,6 +175,7 @@ class _MapScreenState extends State<MapScreen> {
                 Marker(
                       markerId: const MarkerId('selected_location'),
                   position: _currentLatLng!,
+                      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
                       infoWindow: InfoWindow(
                         title: _selectedPlace?.mainText ?? '선택된 위치',
                         snippet: _address.isNotEmpty ? _address : '위치',
@@ -305,7 +306,7 @@ class _MapScreenState extends State<MapScreen> {
                               final suggestion = _suggestions[index];
                               return ListTile(
                                 dense: true,
-                                leading: const Icon(Icons.location_on, color: Colors.blue, size: 20),
+                                                                 leading: const Icon(Icons.location_on, color: Colors.red, size: 20),
                                 title: Text(
                                   suggestion.mainText,
                                   style: const TextStyle(fontWeight: FontWeight.w500),

@@ -288,6 +288,7 @@ class _LocationPickerState extends State<LocationPicker> {
                         _selectedPlace!.latitude,
                         _selectedPlace!.longitude,
                       ),
+                      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
                       infoWindow: InfoWindow(
                         title: _selectedPlace!.name,
                         snippet: _selectedPlace!.address,
