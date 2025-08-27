@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/weather_service.dart';
 import '../services/event_service.dart';
-import '../services/chat_gemini_service.dart';
+import '../services/chat_briefing_service.dart';
+import '../services/user_service.dart';
 import '../models/event.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -13,9 +14,10 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  WeatherService _weatherService = WeatherService();
-  EventService _eventService = EventService();
-  GeminiService _aiService = GeminiService();
+  final WeatherService _weatherService = WeatherService();
+  final EventService _eventService = EventService();
+  final BriefingService _briefingService = BriefingService();
+  final UserService _userService = UserService();
   
   Map<String, dynamic>? _weatherData;
   List<Event> _todayEvents = [];
@@ -37,6 +39,9 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
+      // 사용자 정보 로드 (MBTI 가져오기)
+      await _loadUserInfo();
+      
       // 날씨 정보 로드 (빠른 로딩)
       _loadWeatherData();
       
@@ -55,6 +60,23 @@ class _HomeScreenState extends State<HomeScreen> {
     
     // AI 추천은 별도로 비동기 로드 (화면이 먼저 표시된 후)
     _loadAiRecommendation();
+  }
+
+  Future<void> _loadUserInfo() async {
+    try {
+      var user = await _userService.getCurrentUser();
+      
+      // 앱 최초 실행 시 사용자가 없으면 기본 사용자를 생성
+      user ??= await _userService.createUser(
+        name: '사용자',
+        email: 'user@example.com',
+        mbtiType: 'INFP',
+      );
+      
+      // MBTI는 BriefingService에서 직접 처리
+    } catch (e) {
+      print('사용자 정보 로드 실패: $e');
+    }
   }
 
   Future<void> _loadWeatherData() async {
@@ -86,68 +108,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadAiRecommendation() async {
     if (!mounted) return;
-    
-    setState(() {
-      _isAiLoading = true;
-    });
-
+    setState(() => _isAiLoading = true);
     try {
       final today = DateTime.now();
-      final events = await _eventService.getEventsForDate(today);
-      
-      if (events.isNotEmpty) {
-        final eventSummary = events.map((e) => 
-          '${DateFormat('HH:mm').format(e.startTime)} - ${e.title}'
-        ).join('\n');
-        
-        final prompt = '''
-오늘 일정을 바탕으로 AI 비서가 도움을 드리겠습니다.
-
-오늘 일정:
-$eventSummary
-
-위 일정을 바탕으로 다음을 추천해주세요:
-1. 일정 관리 팁
-2. 시간 활용 조언
-3. 준비사항 안내
-4. 긍정적인 격려 메시지
-
-간결하고 실용적인 조언을 해주세요.
-''';
-
-        final response = await _aiService.sendMessage(
-          message: prompt,
-          systemPrompt: '당신은 친근하고 도움이 되는 AI 비서입니다. 사용자의 일정을 바탕으로 실용적인 조언을 제공해주세요.',
-          functionDeclarations: [],
-        );
-        
-        if (mounted) {
-          setState(() {
-            _aiRecommendation = response.text ?? 'AI 추천을 불러오는 중 오류가 발생했습니다.';
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _aiRecommendation = '오늘은 특별한 일정이 없네요! 새로운 일정을 추가해보시는 건 어떨까요? 😊';
-          });
-        }
-      }
+      // ChatBriefingService에서 브리핑 내용 가져오기
+      final recommendation = await _briefingService.getBriefingForDate(today);
+      if (mounted) setState(() => _aiRecommendation = recommendation);
     } catch (e) {
       print('AI 추천 로드 실패: $e');
-      if (mounted) {
-        setState(() {
-          _aiRecommendation = 'AI 추천을 불러오는 중 오류가 발생했습니다.';
-        });
-      }
+      if (mounted) setState(() => _aiRecommendation = 'AI 추천을 불러오는 중 오류가 발생했습니다.');
     } finally {
-      if (mounted) {
-        setState(() {
-          _isAiLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isAiLoading = false);
     }
   }
+  // _buildSimplePrompt 제거 (ChatBriefingService 사용)
 
   String _getGreeting() {
     final hour = DateTime.now().hour;
@@ -163,7 +137,6 @@ $eventSummary
 
     final temp = _weatherData!['main']?['temp']?.toString() ?? 'N/A';
     final description = _weatherData!['weather']?[0]?['description'] ?? '날씨 정보 없음';
-    final icon = _weatherData!['weather']?[0]?['icon'] ?? '01d';
 
     return Card(
       margin: const EdgeInsets.all(16),

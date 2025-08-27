@@ -44,11 +44,6 @@ class UserService {
     return user;
   }
 
-  // // 사용자 조회
-  // Future<UserProfile?> getUser(String id) async {
-  //   return await _databaseService.getUserProfile(id);
-  // }
-
   // 이메일로 사용자 조회
   Future<UserProfile?> getUserByEmail(String email) async {
     return await _databaseService.getUserProfileByEmail(email);
@@ -273,13 +268,6 @@ class UserService {
     }
     return null;
   }
-
-  // 유니크 ID 생성
-  // String _generateUserId() {
-  //   final timestamp = DateTime.now().millisecondsSinceEpoch;
-  //   final random = Random().nextInt(10000);
-  //   return 'user_${timestamp}_$random';
-  // }
 
   // 현재 사용자 설정 (로그인 시 사용)
   void setCurrentUser(UserProfile user) {

@@ -21,7 +21,6 @@ import 'chat_briefing_service.dart';
 import 'chat_weather_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'chat_recommend_service.dart';
-import 'chat_location_service.dart';
 
 class ChatService {
   static final ChatService _instance = ChatService._internal();
@@ -143,7 +142,7 @@ class ChatProvider with ChangeNotifier {
       );
       _currentUserMbti = user.mbtiType ?? 'INFP';
 
-      await _loadInitialMessage();
+      // 시작 시 자동 브리핑은 하지 않습니다. (요청 시에만 실행)
 
     } catch (e) {
       final errorMessage = types.TextMessage(
@@ -361,13 +360,7 @@ class ChatProvider with ChangeNotifier {
         _conversationHistory.add({'parts': [{'text': aiText}], 'role': 'model'});
         return;
       }
-      // 일정 위치 로컬 처리: 서비스에 위임
-      // if (RegExp(r'일정.*(위치|장소)').hasMatch(processedText)) {
-      //   final reply = await ChatLocationService().getEventLocation();
-      //   _addMessage(types.TextMessage(author: _aiAssistant, createdAt: DateTime.now().millisecondsSinceEpoch, id: _randomString(), text: reply));
-      //   return;
-      // }
-      // 일정 날씨 로컬 처리: 서비스에 위임
+
       if (RegExp(r'일정.*날씨').hasMatch(processedText)) {
         final res = await _weatherService.handleFunctionCall(GeminiFunctionCall(name: 'getWeatherForTodayEvent', args: {}));
         final reply = res['status'] as String;
@@ -455,6 +448,17 @@ class ChatProvider with ChangeNotifier {
       text: text,
     );
     _addMessage(aiMessage);
+  }
+
+  /// 사용자 메시지를 UI에 직접 추가합니다.
+  void addUserText(String text) {
+    final userMessage = types.TextMessage(
+      author: _user,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      id: _randomString(),
+      text: text,
+    );
+    _addMessage(userMessage);
   }
 
   /// 사용자 요청시 오늘 일정 브리핑을 다시 로드합니다.

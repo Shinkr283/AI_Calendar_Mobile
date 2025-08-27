@@ -30,7 +30,7 @@ class ChatScreen extends StatelessWidget {
                   CircularProgressIndicator(),
                   SizedBox(height: 8),
                   Text(
-                    '잠시만 기다려주세요. 브리핑을 준비 중입니다.',
+                    '잠시만 기다려주세요.',
                     style: TextStyle(fontSize: 16),
                   ),
                 ],
@@ -38,6 +38,16 @@ class ChatScreen extends StatelessWidget {
             );
           }
           
+          // 최초 진입 시 인사말 1회 출력
+          if (!provider.isLoading && provider.messages.isEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              // 이중 추가 방지: 콜백 시점에 빈 경우에만
+              if (provider.messages.isEmpty) {
+                provider.addAssistantText('안녕하세요! 무엇을 도와드릴까요?');
+              }
+            });
+          }
+
           return Chat(
             messages: provider.messages,
             onSendPressed: (partial) async {
@@ -62,6 +72,7 @@ class ChatScreen extends StatelessWidget {
               final weatherMatch = RegExp(r'(.+?)\s*날씨').firstMatch(text);
               if (weatherMatch != null) {
                 final location = weatherMatch.group(1)!.trim();
+                provider.addUserText(text);
                 final place = await PlacesService.geocodeAddress(location);
                 if (place != null) {
                   final weather = await WeatherService().fetchWeather(place.latitude, place.longitude);
@@ -77,10 +88,11 @@ class ChatScreen extends StatelessWidget {
                 }
                 return;
               }
-              // '<장소> 위치' 요청: 지도 화면으로 이동
+              // '<장소> 위치' 요청: 먼저 사용자 발화를 채팅에 남기고, 그 다음 지도 화면으로 이동
               final locMatch = RegExp(r'(.+?)\s*(위치|장소)\s*(보여줘|알려줘)').firstMatch(text);
               if (locMatch != null) {
                 final location = locMatch.group(1)!.trim();
+                provider.addUserText(text);
                 final place = await PlacesService.geocodeAddress(location);
                 if (place != null) {
                   Navigator.of(context).push(

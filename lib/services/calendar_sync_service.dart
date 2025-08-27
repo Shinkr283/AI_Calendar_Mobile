@@ -27,7 +27,7 @@ class CalendarSyncService {
     return auth.accessToken;
   }
 
-  Future<int> syncCurrentMonth({bool readonly = false}) async {
+  Future<int> syncCurrentMonth({bool readonly = true}) async {
     final now = DateTime.now();
     final start = DateTime(now.year, now.month, 1);
     final end = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
@@ -37,7 +37,7 @@ class CalendarSyncService {
   Future<int> syncRange({
     required DateTime start,
     required DateTime end,
-    bool readonly = false,
+    bool readonly = true,
   }) async {
     final token = await _ensureAccessToken(readonly: readonly);
     if (token == null || token.isEmpty) {
@@ -220,10 +220,10 @@ class CalendarSyncService {
           lastSyncedMap[created.id ?? ''] = updated.updatedAt.millisecondsSinceEpoch.toString();
           pushed++;
         } else {
-          // 로컬 존재, 구글에 삭제되었는지 확인
+          // 로컬 존재. 이번 조회 결과에 없다면, 부분 조회(updatedMin/기간 제한)일 수 있으므로 삭제하지 않음
           if (!googleIdsInRange.contains(e.googleEventId!)) {
-            // 구글에 없다면 로컬 삭제로 간주(또는 복원 정책 고려). 여기서는 삭제 동기화
-            await EventService().deleteEvent(e.id);
+            // 안전을 위해 스킵 (추후 전체 동기화 또는 개별 조회로 검증 후 삭제)
+            continue;
           } else {
             // 변경 감지: 마지막 동기화 시간보다 로컬 updatedAt이 크면 구글 업데이트
             final last = int.tryParse(lastSyncedMap[e.googleEventId!] ?? '0') ?? 0;

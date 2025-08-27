@@ -12,7 +12,7 @@ class ChatScheduleUpdate {
   Future<Map<String, dynamic>> updateEvent(Map<String, dynamic> args) async {
     try {
       final eventService = EventService();
-      final existingEvent = await _resolveEventByArgs(args);
+      final existingEvent = await resolveEventByArgs(args);
       
       if (existingEvent == null) {
         return {'status': '오류: 해당 ID의 일정을 찾을 수 없습니다.'};
@@ -68,6 +68,7 @@ class ChatScheduleUpdate {
       
       await eventService.updateEvent(updatedEvent);
       await _applyAlarm(updatedEvent, alarmMin);
+      // 로컬에만 저장, 수동 동기화 시 적용됨
       
       return {
         'status': '일정이 성공적으로 수정되었습니다.',
@@ -131,6 +132,7 @@ class ChatScheduleUpdate {
         );
         await eventService.updateEvent(updated);
         await _applyAlarm(updated, alarmMin);
+        // 로컬에만 저장, 수동 동기화 시 적용됨
         return {
           'status': '기존 일정이 수정되었습니다.',
           'eventId': updated.id,
@@ -149,6 +151,7 @@ class ChatScheduleUpdate {
         alarmMinutesBefore: alarmMin,
       );
       await _applyAlarm(created, alarmMin);
+      // 로컬에만 저장, 수동 동기화 시 적용됨
       return {
         'status': '일정이 성공적으로 생성되었습니다.',
         'eventId': created.id,
@@ -160,8 +163,8 @@ class ChatScheduleUpdate {
     }
   }
 
-  // ===== 내부 유틸 =====
-  Future<Event?> _resolveEventByArgs(Map<String, dynamic> args) async {
+  // ===== 공용 유틸 =====
+  Future<Event?> resolveEventByArgs(Map<String, dynamic> args) async {
     final eventService = EventService();
     // 0) gid(googleEventId)로 우선 식별
     final gid = (args['gid'] as String?) ?? (args['googleEventId'] as String?);
@@ -225,6 +228,20 @@ class ChatScheduleUpdate {
     return null;
   }
 
+  // 공통: 날짜 파싱 ('오늘'/'today' 또는 'YYYY-MM-DD')
+  static DateTime parseBaseDate(String? dateStr) {
+    if (dateStr == null) return DateTime.now();
+    final lowered = dateStr.toLowerCase();
+    if (lowered == '오늘' || lowered == 'today') {
+      return DateTime.now();
+    }
+    try {
+      return DateTime.parse(dateStr);
+    } catch (_) {
+      return DateTime.now();
+    }
+  }
+
   String _parseKoreanTime(String input) {
     var text = input.trim().replaceAll('시', ':00').replaceAll('분', '').replaceAll(' ', '');
     // 숫자만 있는 경우 (예: 18) → 18:00
@@ -265,14 +282,16 @@ class ChatScheduleUpdate {
     return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
   }
 
-  // 공통: 네이티브 알람 적용(기존 취소 후 재설정)
+  // 공통: 네이티브 알람 적용(기존 취소 후 재설정) - EventService와 동일한 로직
   Future<void> _applyAlarm(Event event, int alarmMin) async {
     try {
       await NativeAlarmService.cancelNativeAlarm(event.id.hashCode);
     } catch (_) {}
+    
     if (alarmMin > 0) {
       final alarmTime = event.startTime.subtract(Duration(minutes: alarmMin));
       final delaySeconds = alarmTime.difference(DateTime.now()).inSeconds;
+      
       if (delaySeconds > 0) {
         await NativeAlarmService.scheduleNativeAlarm(
           notificationId: event.id.hashCode,
@@ -281,6 +300,31 @@ class ChatScheduleUpdate {
           body: '${event.title} 일정이 곧 시작됩니다.',
         );
       }
+    }
+  }
+
+  // 일정 삭제 처리
+  Future<Map<String, dynamic>> deleteEvent(Map<String, dynamic> args) async {
+    try {
+      final eventService = EventService();
+      final existingEvent = await resolveEventByArgs(args);
+      
+      if (existingEvent == null) {
+        return {'status': '오류: 해당 ID의 일정을 찾을 수 없습니다.'};
+      }
+      
+      final success = await eventService.deleteEvent(existingEvent.id);
+      
+      if (success) {
+        return {
+          'status': '일정이 성공적으로 삭제되었습니다.',
+          'deletedTitle': existingEvent.title,
+        };
+      } else {
+        return {'status': '오류: 일정 삭제에 실패했습니다.'};
+      }
+    } catch (e) {
+      return {'status': '오류: 일정을 삭제하는 중 문제가 발생했습니다: $e'};
     }
   }
 
@@ -305,7 +349,9 @@ class ChatScheduleUpdate {
       }
       if (title.isEmpty || dt == null) return '제목과 날짜/시간을 확인해주세요.';
       if (action == '추가') {
-        final ev = await EventService().createEvent(
+        // EventService를 통한 일정 생성
+        final eventService = EventService();
+        final ev = await eventService.createEvent(
           title: title,
           description: '',
           startTime: dt,
@@ -313,17 +359,11 @@ class ChatScheduleUpdate {
           location: location,
           alarmMinutesBefore: alarmMin,
         );
-        if (alarmMin > 0) {
-          await NativeAlarmService.scheduleNativeAlarm(
-            notificationId: ev.id.hashCode,
-            delaySeconds: alarmMin,
-            title: '일정 알림',
-            body: '${ev.title} 일정이 곧 시작됩니다.',
-          );
-        }
+        // 일관된 알림 적용
+        await _applyAlarm(ev, alarmMin);
         return '일정이 추가되었습니다: ${ev.title} (${DateFormat('yyyy-MM-dd HH:mm').format(dt)})';
       } else {
-        // 수정: 제목으로 이벤트 검색
+        // 수정: resolveEventByArgs를 사용하여 일관된 이벤트 검색
         final list = await EventService().getEventsForDate(dt);
         Event? match;
         for (final e2 in list) {
@@ -333,23 +373,18 @@ class ChatScheduleUpdate {
           }
         }
         if (match == null) return '수정할 일정을 찾을 수 없습니다.';
+        
         final updated = match.copyWith(
           startTime: dt,
           endTime: dt.add(const Duration(hours: 1)),
           location: location.isNotEmpty ? location : match.location,
           alarmMinutesBefore: alarmMin,
         );
+        
+        // EventService를 통한 일정 수정
         await EventService().updateEvent(updated);
-        // 기존 알람 취소 후 재설정
-        await NativeAlarmService.cancelNativeAlarm(updated.id.hashCode);
-        if (alarmMin > 0) {
-          await NativeAlarmService.scheduleNativeAlarm(
-            notificationId: updated.id.hashCode,
-            delaySeconds: alarmMin,
-            title: '일정 알림',
-            body: '${updated.title} 일정 알람이 ${alarmMin}분 전으로 변경되었습니다.',
-          );
-        }
+        // 일관된 알림 적용
+        await _applyAlarm(updated, alarmMin);
         return '일정이 수정되었습니다: ${updated.title} (${DateFormat('yyyy-MM-dd HH:mm').format(dt)})';
       }
     } catch (e) {
