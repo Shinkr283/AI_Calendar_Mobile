@@ -24,6 +24,8 @@ class GoogleCalendarService {
     String orderBy = 'startTime',
     String? timeZone,
     bool showDeleted = true,
+    DateTime? updatedMin,
+    String? fields,
   }) async {
     final client = GoogleHttpClient(accessToken);
     final api = calendar.CalendarApi(client);
@@ -36,6 +38,8 @@ class GoogleCalendarService {
       timeZone: timeZone,
       maxResults: 2500,
       showDeleted: showDeleted,
+      updatedMin: updatedMin?.toUtc(),
+      $fields: fields,
     );
     return res.items ?? [];
   }

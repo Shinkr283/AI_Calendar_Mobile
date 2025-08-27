@@ -141,9 +141,10 @@ class DatabaseService {
 
       // 인덱스 생성
       print('📊 인덱스 생성 중...');
-      await db.execute('CREATE INDEX idx_events_start_time ON events(startTime)');
-      await db.execute('CREATE INDEX idx_chat_messages_session ON chat_messages(sessionId)');
-      await db.execute('CREATE INDEX idx_chat_messages_timestamp ON chat_messages(timestamp)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_events_start_time ON events(startTime)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_events_updated_at ON events(updatedAt)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(sessionId)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_chat_messages_timestamp ON chat_messages(timestamp)');
       print('✅ 모든 인덱스 생성 완료');
       
       print('🎉 데이터베이스 테이블 생성 모두 완료!');
@@ -346,6 +347,25 @@ class DatabaseService {
         return db.update('events', event.toMap(), where: 'id = ?', whereArgs: [event.id]);
       }
       return 0;
+    });
+  }
+
+  // 대량 업데이트(배치)
+  Future<int> bulkUpdateEvents(List<Event> events) {
+    if (events.isEmpty) return Future.value(0);
+    return _withDb<int>((db) async {
+      final batch = db.batch();
+      for (final e in events) {
+        batch.update(
+          'events',
+          e.toMap(),
+          where: 'id = ?',
+          whereArgs: [e.id],
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      final results = await batch.commit(noResult: false, continueOnError: true);
+      return results.length;
     });
   }
 
