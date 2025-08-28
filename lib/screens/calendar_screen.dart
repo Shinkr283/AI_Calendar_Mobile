@@ -35,7 +35,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   Future<void> _loadEventsForMonth(DateTime month) async {
     setState(() => _isLoading = true);
-    final events = await EventService().getEventsForMonth(month);
+    // 월별 일정 대신 모든 일정을 로드 (월 상관없이 표시)
+    final events = await EventService().getEvents();
     final holidays = await HolidayService().getHolidaysForYear(month.year);
     setState(() {
       _events = events;
@@ -50,6 +51,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
       _focusedDay = focusedDay;
     });
     // 날짜를 선택해도 월 전체 일정을 유지
+  }
+  
+  void _onPageChanged(DateTime focusedDay) {
+    setState(() {
+      _focusedDay = focusedDay;
+    });
+    // 월이 변경되면 해당 월의 일정을 로드
+    _loadEventsForMonth(focusedDay);
   }
 
   void _onAddEvent() async {
@@ -610,6 +619,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             calendarFormat: CalendarFormat.month,
             selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
             onDaySelected: _onDaySelected,
+            onPageChanged: _onPageChanged,
             eventLoader: (day) => _events.where((e) => isSameDay(e.startTime, day)).toList(),
             headerStyle: const HeaderStyle(
               formatButtonVisible: false,
@@ -876,12 +886,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Future<void> _onSyncWithGoogle() async {
+    // 월 선택 다이얼로그 표시
+    final selectedMonth = await _showSyncMonthSelectionDialog();
+    if (selectedMonth == null) return; // 사용자가 취소한 경우
+    
     setState(() => _isLoading = true);
     try {
-      final inserted = await CalendarSyncService().syncCurrentMonth(readonly: false);
+      final inserted = await CalendarSyncService().syncSpecificMonth(selectedMonth, readonly: false);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('동기화 완료: ${inserted}건')),
+        SnackBar(content: Text('${selectedMonth.year}년 ${selectedMonth.month}월 동기화 완료: ${inserted}건')),
       );
       await _loadEventsForMonth(_focusedDay);
     } catch (e) {
@@ -892,5 +906,129 @@ class _CalendarScreenState extends State<CalendarScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+  
+  Future<DateTime?> _showSyncMonthSelectionDialog() async {
+    final currentDate = DateTime.now();
+    
+    // 1단계: 년도 선택
+    final selectedYear = await _showYearSelectionDialog(currentDate.year);
+    if (selectedYear == null) return null;
+    
+    // 2단계: 월 선택
+    final selectedMonth = await _showMonthSelectionDialog(selectedYear);
+    if (selectedMonth == null) return null;
+    
+    return DateTime(selectedYear, selectedMonth, 1);
+  }
+  
+  Future<int?> _showYearSelectionDialog(int currentYear) async {
+    return await showDialog<int>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('동기화할 년도를 선택하세요'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 300,
+          child: GridView.builder(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              childAspectRatio: 2.5,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+            ),
+            itemCount: 11, // 2020년부터 2030년까지
+            itemBuilder: (context, index) {
+              final year = 2020 + index;
+              final isSelected = year == currentYear;
+              
+              return InkWell(
+                onTap: () => Navigator.of(context).pop(year),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isSelected ? Colors.blue : Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isSelected ? Colors.blue : Colors.grey.shade300,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      year.toString(),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? Colors.white : Colors.black,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('취소'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Future<int?> _showMonthSelectionDialog(int selectedYear) async {
+    return await showDialog<int>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('$selectedYear년 동기화할 월을 선택하세요'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 200,
+          child: GridView.builder(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              childAspectRatio: 2.5,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+            ),
+            itemCount: 12,
+            itemBuilder: (context, index) {
+              final month = index + 1;
+              final monthNames = [
+                '1월', '2월', '3월', '4월', '5월', '6월',
+                '7월', '8월', '9월', '10월', '11월', '12월'
+              ];
+              
+              return InkWell(
+                onTap: () => Navigator.of(context).pop(month),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Center(
+                    child: Text(
+                      monthNames[index],
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('취소'),
+          ),
+        ],
+      ),
+    );
   }
 } 

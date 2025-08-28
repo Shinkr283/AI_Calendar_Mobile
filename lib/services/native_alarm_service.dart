@@ -86,4 +86,34 @@ class NativeAlarmService {
       notificationId: 555,
     );
   }
+
+  /// 매일 반복되는 하루 일정 알림 예약
+  static Future<void> scheduleDailyNotification({
+    required String title,
+    required String body,
+    required int hour,
+    required int minute,
+    int notificationId = 10000,
+  }) async {
+    try {
+      print('📅 매일 반복 알림 예약 시작');
+      print('📝 제목: $title');
+      print('📝 내용: $body');
+      print('🕐 시간: ${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}');
+      print('🆔 알림 ID: $notificationId');
+      
+      final String result = await platform.invokeMethod('scheduleDailyNotification', {
+        'title': title,
+        'body': body,
+        'hour': hour,
+        'minute': minute,
+        'notificationId': notificationId,
+      });
+      
+      print('✅ $result');
+    } on PlatformException catch (e) {
+      print('❌ 매일 반복 알림 예약 실패: ${e.message}');
+      throw Exception('매일 반복 알림 예약 실패: ${e.message}');
+    }
+  }
 }

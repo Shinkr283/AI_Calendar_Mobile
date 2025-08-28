@@ -169,6 +169,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _notificationTime = picked;
       });
       await _saveSettings();
+      
+      // 하루 일정 알림이 활성화되어 있으면 새로운 시간으로 재예약
+      if (_isDailyNotificationEnabled) {
+        await SettingsService().setNotificationTime(picked);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('알림 시간이 ${picked.format(context)}로 변경되었습니다'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -473,11 +486,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       : '알림 꺼짐',
                   trailing: Switch(
                     value: _isDailyNotificationEnabled,
-                    onChanged: (value) {
+                    onChanged: (value) async {
                       setState(() {
                         _isDailyNotificationEnabled = value;
                       });
-                      _saveSettings();
+                      await _saveSettings();
+                      
+                      // 즉시 알림 예약/취소
+                      if (value) {
+                        await SettingsService().setIsDailyNotificationEnabled(true);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('하루 일정 알림이 활성화되었습니다'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                      } else {
+                        await SettingsService().setIsDailyNotificationEnabled(false);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('하루 일정 알림이 비활성화되었습니다'),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                        }
+                      }
                     },
                   ),
                   iconColor: _isDailyNotificationEnabled ? Colors.orange : Colors.grey,

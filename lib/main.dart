@@ -25,6 +25,7 @@ import 'services/location_service.dart';
 import 'services/native_alarm_service.dart';
 import 'services/holiday_service.dart';
 import 'services/chat_prompt_service.dart';
+import 'services/settings_service.dart';
 import 'providers/theme_provider.dart';
 
 
@@ -116,6 +117,13 @@ void _initializeBackgroundServices() {
       final mbti = currentUser?.mbtiType ?? 'INFP';
       PromptService().createSystemPrompt(mbti);
     } catch (_) {}
+
+    // 하루 일정 알림 복원
+    try {
+      await SettingsService().restoreDailyNotification();
+    } catch (e) {
+      print('하루 일정 알림 복원 실패: $e');
+    }
   });
 }
 

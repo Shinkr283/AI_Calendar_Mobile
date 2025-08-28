@@ -33,6 +33,12 @@ class CalendarSyncService {
     final end = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
     return syncRange(start: start, end: end, readonly: readonly);
   }
+  
+  Future<int> syncSpecificMonth(DateTime month, {bool readonly = true}) async {
+    final start = DateTime(month.year, month.month, 1);
+    final end = DateTime(month.year, month.month + 1, 0, 23, 59, 59);
+    return syncRange(start: start, end: end, readonly: readonly);
+  }
 
   Future<int> syncRange({
     required DateTime start,
