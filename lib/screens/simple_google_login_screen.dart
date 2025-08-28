@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../services/simple_google_sign_in_service.dart';
 import '../main.dart';
+import 'calendar_sync_prompt_screen.dart';
 
 class SimpleGoogleLoginScreen extends StatefulWidget {
   const SimpleGoogleLoginScreen({super.key});
@@ -41,9 +42,9 @@ class _SimpleGoogleLoginScreenState extends State<SimpleGoogleLoginScreen> {
           _isLoading = false;
         });
         
-        // 메인 화면으로 이동
+        // 구글 캘린더 동기화 화면으로 이동
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const MainScreen()),
+          MaterialPageRoute(builder: (context) => const CalendarSyncPromptScreen()),
         );
       } else {
         setState(() {

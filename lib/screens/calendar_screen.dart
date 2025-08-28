@@ -3,7 +3,6 @@ import 'package:table_calendar/table_calendar.dart';
 import '../services/event_service.dart';
 import '../models/event.dart';
 import '../widgets/event_form.dart';
-import 'calendar_sync_prompt_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/calendar_sync_service.dart';
 import '../services/holiday_service.dart';
@@ -29,34 +28,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
     super.initState();
     _selectedDay = _focusedDay;
     _loadEventsForMonth(_focusedDay);
-    _showSyncPromptIfNeeded();
+    // 동기화 화면은 로그인 후 바로 표시되므로 여기서는 제거
   }
 
-  Future<void> _showSyncPromptIfNeeded() async {
-    final prefs = await SharedPreferences.getInstance();
-    final hasSeenSyncPrompt = prefs.getBool('hasSeenSyncPrompt') ?? false;
-    if (!hasSeenSyncPrompt) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (dialogContext) => CalendarSyncPromptScreen(
-            onSyncComplete: () async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('hasSeenSyncPrompt', true);
-              Navigator.maybePop(dialogContext);
-            },
-            onSkip: () async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('hasSeenSyncPrompt', true);
-              Navigator.maybePop(dialogContext);
-            },
-          ),
-        );
-      });
-    }
-  }
+
 
   Future<void> _loadEventsForMonth(DateTime month) async {
     setState(() => _isLoading = true);

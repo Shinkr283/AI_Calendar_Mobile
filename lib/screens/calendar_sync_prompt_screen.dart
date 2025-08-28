@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/google_calendar_service.dart';
 import '../services/event_service.dart';
 import '../main.dart';
@@ -52,6 +53,11 @@ class CalendarSyncPromptScreen extends StatelessWidget {
       messenger.showSnackBar(
         SnackBar(content: Text('구글 캘린더에서 $successCount개의 일정을 동기화했습니다.')),
       );
+      
+      // 동기화 완료 플래그 설정
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('hasSeenSyncPrompt', true);
+      
       if (onSyncComplete != null) onSyncComplete!();
       navigator.pushReplacement(
         MaterialPageRoute(builder: (_) => const MainScreen()),
@@ -63,7 +69,11 @@ class CalendarSyncPromptScreen extends StatelessWidget {
     }
   }
 
-  void _onSkip(BuildContext context) {
+  void _onSkip(BuildContext context) async {
+    // 건너뛰기 플래그 설정
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('hasSeenSyncPrompt', true);
+    
     if (onSkip != null) onSkip!();
     Navigator.pushReplacement(
       context,
