@@ -4,15 +4,11 @@ import 'package:provider/provider.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../services/simple_google_sign_in_service.dart';
 import '../services/native_alarm_service.dart';
-import '../services/calendar_sync_service.dart';
 import '../services/user_service.dart';
-// import '../services/google_calendar_service.dart'; // 임시로 주석 처리
 import '../services/settings_service.dart';
 import '../providers/theme_provider.dart';
 import '../models/user_profile.dart';
 import 'simple_google_login_screen.dart';
-import 'weather_screen.dart';
-import 'map_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -26,7 +22,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isLoading = true;
   bool _isDarkMode = false;
   int _weekStartDay = 0; // 0: 일요일, 1: 월요일
-  bool _isCalendarSynced = false;
+
   bool _isDailyNotificationEnabled = true;
   TimeOfDay _notificationTime = const TimeOfDay(hour: 9, minute: 0);
 
@@ -63,7 +59,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         setState(() {
           _weekStartDay = settings['weekStartDay'];
           _isDarkMode = settings['isDarkMode'];
-          _isCalendarSynced = settings['isCalendarSynced'];
           _isDailyNotificationEnabled = settings['isDailyNotificationEnabled'];
           _notificationTime = settings['notificationTime'];
         });
@@ -77,7 +72,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       await SettingsService().setWeekStartDay(_weekStartDay);
       await SettingsService().setIsDarkMode(_isDarkMode);
-      await SettingsService().setIsCalendarSynced(_isCalendarSynced);
       await SettingsService().setIsDailyNotificationEnabled(_isDailyNotificationEnabled);
       await SettingsService().setNotificationTime(_notificationTime);
     } catch (e) {
@@ -108,49 +102,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> _syncGoogleCalendar() async {
-    try {
-      setState(() {
-        _isLoading = true;
-      });
 
-      print('🔄 구글 캘린더 양방향 동기화 시작');
-      
-      // CalendarSyncService를 사용하여 양방향 동기화
-      final syncService = CalendarSyncService();
-      final syncedCount = await syncService.syncCurrentMonth(readonly: false);
-      
-      setState(() {
-        _isLoading = false;
-      });
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('구글 캘린더 동기화 완료! ${syncedCount}개 일정이 동기화되었습니다'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
-    } catch (e) {
-      print('❌ 구글 캘린더 동기화 실패: $e');
-      
-      setState(() {
-        _isLoading = false;
-      });
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('구글 캘린더 동기화 실패: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
-    }
-  }
 
   Future<void> _selectNotificationTime() async {
     final TimeOfDay? picked = await showTimePicker(
@@ -383,68 +335,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             // 사용자 정보 섹션
             _buildUserSection(),
 
-            // 구글 서비스 섹션
-            _buildSettingsSection(
-              '구글 서비스',
-              [
-                _buildSettingsTile(
-                  icon: Icons.sync,
-                  title: '구글 캘린더 일정 동기화',
-                  subtitle: '구글 캘린더와 양방향 동기화',
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: _syncGoogleCalendar,
-                  iconColor: Colors.blue,
-                ),
-              ],
-            ),
+
 
             // 외관 섹션
             _buildSettingsSection(
               '외관',
               [
-                _buildSettingsTile(
-                  icon: Icons.calendar_view_week,
-                  title: '주 시작 요일',
-                  subtitle: _getWeekStartDayText(_weekStartDay),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('주 시작 요일 선택'),
-                        content: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            RadioListTile<int>(
-                              title: const Text('일요일'),
-                              value: 0,
-                              groupValue: _weekStartDay,
-                              onChanged: (value) {
-                                setState(() {
-                                  _weekStartDay = value!;
-                                });
-                                _saveSettings();
-                                Navigator.of(context).pop();
-                              },
-                            ),
-                            RadioListTile<int>(
-                              title: const Text('월요일'),
-                              value: 1,
-                              groupValue: _weekStartDay,
-                              onChanged: (value) {
-                                setState(() {
-                                  _weekStartDay = value!;
-                                });
-                                _saveSettings();
-                                Navigator.of(context).pop();
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
                 _buildSettingsTile(
                   icon: _isDarkMode ? Icons.dark_mode : Icons.light_mode,
                   title: '다크 모드',
@@ -554,38 +450,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
 
-            // 추가 기능 섹션
-            _buildSettingsSection(
-              '추가 기능',
-              [
-                _buildSettingsTile(
-                  icon: Icons.wb_sunny,
-                  title: '날씨 정보 보기',
-                  subtitle: '현재 위치의 날씨 확인',
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const WeatherScreen()),
-                    );
-                  },
-                  iconColor: Colors.orange,
-                ),
-                _buildSettingsTile(
-                  icon: Icons.map,
-                  title: '내 위치 지도 보기',
-                  subtitle: '현재 위치를 지도에서 확인',
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const MapScreen()),
-                    );
-                  },
-                  iconColor: Colors.green,
-                ),
-              ],
-            ),
+
 
             const SizedBox(height: 20),
           ],

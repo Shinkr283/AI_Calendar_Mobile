@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/calendar_sync_service.dart';
 import '../services/holiday_service.dart';
 import '../services/native_alarm_service.dart';
-import '../utils/database_test_utils.dart';
+import '../services/settings_service.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -22,12 +22,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
   List<Event> _events = [];
   Map<String, String> _holidays = {};
   bool _isLoading = false;
+  StartingDayOfWeek _startingDayOfWeek = StartingDayOfWeek.sunday;
 
   @override
   void initState() {
     super.initState();
     _selectedDay = _focusedDay;
     _loadEventsForMonth(_focusedDay);
+    _loadWeekStartDay();
     // 동기화 화면은 로그인 후 바로 표시되므로 여기서는 제거
   }
 
@@ -43,6 +45,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
       _holidays = holidays;
       _isLoading = false;
     });
+  }
+
+  Future<void> _loadWeekStartDay() async {
+    try {
+      final settingsService = SettingsService();
+      final weekStartDay = await settingsService.getWeekStartDay();
+      setState(() {
+        _startingDayOfWeek = weekStartDay == 0 
+            ? StartingDayOfWeek.sunday 
+            : StartingDayOfWeek.monday;
+      });
+    } catch (e) {
+      print('주 시작 요일 로드 실패: $e');
+    }
   }
 
   void _onDaySelected(DateTime selectedDay, DateTime focusedDay) {
@@ -271,356 +287,49 @@ class _CalendarScreenState extends State<CalendarScreen> {
         actions: [
           PopupMenuButton<String>(
             onSelected: (value) async {
-              switch (value) {
-                case 'test_db':
-                  try {
-                    await DatabaseTestUtils.testDatabaseConnection();
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('데이터베이스 테스트 완료! 콘솔 로그를 확인하세요.'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('데이터베이스 테스트 실패: $e'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  }
-                  break;
-                case 'db_info':
-                  try {
-                    final info = await DatabaseTestUtils.getDatabaseInfo();
-                    if (mounted) {
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('데이터베이스 정보'),
-                          content: SingleChildScrollView(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text('경로: ${info['databasePath']}'),
-                                const SizedBox(height: 8),
-                                const Text('테이블:', style: TextStyle(fontWeight: FontWeight.bold)),
-                                ...((info['tables'] as List).map((table) => Text('- $table'))),
-                                const SizedBox(height: 8),
-                                const Text('레코드 수:', style: TextStyle(fontWeight: FontWeight.bold)),
-                                ...((info['tableCounts'] as Map<String, int>).entries.map((entry) => 
-                                  Text('- ${entry.key}: ${entry.value}개'))),
-                              ],
-                            ),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('닫기'),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('데이터베이스 정보 조회 실패: $e'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  }
-                  break;
-                case 'notification_permission':
-                  if (mounted) {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('🚨 네이티브 알림 시스템'),
-                        content: const SingleChildScrollView(
-                          child: Text(
-                            '✅ 네이티브 AlarmManager 사용 중\n'
-                            '🔧 안드로이드 시스템 레벨에서 직접 관리\n'
-                            '⚡ 가장 강력한 알림 방식\n'
-                            '🛡️ 배터리 최적화 무시\n'
-                            '🔄 앱 종료 후에도 작동\n\n'
-                            '📱 만약 알림이 안 온다면:\n'
-                            '1. 휴대폰 재부팅\n'
-                            '2. 앱 재설치\n'
-                            '3. 제조사별 추가 알림 설정 확인\n'
-                            '4. 방해 금지 모드 해제\n\n'
-                            '🎯 네이티브 테스트로 확인하세요!',
-                            style: TextStyle(fontSize: 14),
-                          ),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            child: const Text('확인'),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-                  break;
-
-                case 'clear_notifications':
-                  try {
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('알림 삭제 확인'),
-                        content: const Text('모든 예약된 알림을 삭제하시겠습니까?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: const Text('취소'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            child: const Text('삭제'),
-                          ),
-                        ],
-                      ),
-                    );
-                    
-                    if (confirmed == true) {
-                      // 모든 네이티브 알림 삭제 (ID 1~999 범위에서 시도)
-                      int canceledCount = 0;
-                      for (int i = 1; i <= 999; i++) {
-                        try {
-                          await NativeAlarmService.cancelNativeAlarm(i);
-                          canceledCount++;
-                        } catch (e) {
-                          // 무시 - 해당 ID에 알림이 없을 수 있음
-                        }
-                      }
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('모든 네이티브 알림이 삭제되었습니다. (시도된 수: $canceledCount)'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      }
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('알림 삭제 실패: $e'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  }
-                  break;
-
-
-                case 'native_10_second_test':
-                  try {
-                    await NativeAlarmService.scheduleNativeTestAlarm();
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('🚨 네이티브 10초 후 알림이 예약되었습니다! 강력한 AlarmManager 사용'),
-                          backgroundColor: Colors.red,
-                          duration: Duration(seconds: 3),
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    print('네이티브 10초 후 알림 예약 실패: $e');
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('네이티브 10초 후 알림 예약 실패: $e'),
-                          backgroundColor: Colors.red,
-                          duration: const Duration(seconds: 3),
-                        ),
-                      );
-                    }
-                  }
-                  break;
-
-                case 'native_5_second_test':
-                  try {
-                    await NativeAlarmService.scheduleQuickNativeTestAlarm();
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('⚡ 네이티브 5초 후 알림이 예약되었습니다! 초고속 확인'),
-                          backgroundColor: Colors.purple,
-                          duration: Duration(seconds: 3),
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    print('네이티브 5초 후 알림 예약 실패: $e');
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('네이티브 5초 후 알림 예약 실패: $e'),
-                          backgroundColor: Colors.red,
-                          duration: const Duration(seconds: 3),
-                        ),
-                      );
-                    }
-                  }
-                  break;
-
-                case 'native_immediate_test':
-                  try {
-                    await NativeAlarmService.scheduleImmediateTestAlarm();
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('🔔 즉시 네이티브 알림이 예약되었습니다! 1초 후 확인'),
-                          backgroundColor: Colors.green,
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    print('즉시 네이티브 알림 예약 실패: $e');
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('즉시 네이티브 알림 예약 실패: $e'),
-                          backgroundColor: Colors.red,
-                          duration: const Duration(seconds: 3),
-                        ),
-                      );
-                    }
-                  }
-                  break;
-
-                case 'native_fullscreen_test':
-                  try {
-                    await NativeAlarmService.scheduleFullScreenTestAlarm();
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('🚨 강력한 전체화면 알림이 예약되었습니다! 2초 후 반드시 표시됩니다!'),
-                          backgroundColor: Colors.red,
-                          duration: Duration(seconds: 3),
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    print('강력한 전체화면 알림 예약 실패: $e');
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('강력한 전체화면 알림 예약 실패: $e'),
-                          backgroundColor: Colors.red,
-                          duration: const Duration(seconds: 3),
-                        ),
-                      );
-                    }
-                  }
-                  break;
+              if (value == 'sync_google_calendar') {
+                _onSyncWithGoogle();
+              } else if (value == 'week_start_day') {
+                _showWeekStartDayDialog();
               }
             },
             itemBuilder: (context) => [
               const PopupMenuItem(
-                value: 'test_db',
+                value: 'sync_google_calendar',
                 child: Row(
                   children: [
-                    Icon(Icons.bug_report),
+                    Icon(Icons.sync),
                     SizedBox(width: 8),
-                    Text('DB 테스트'),
+                    Text('구글 캘린더 일정 동기화'),
                   ],
                 ),
               ),
               const PopupMenuItem(
-                value: 'db_info',
+                value: 'week_start_day',
                 child: Row(
                   children: [
-                    Icon(Icons.info),
+                    Icon(Icons.calendar_view_week),
                     SizedBox(width: 8),
-                    Text('DB 정보'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'notification_permission',
-                child: Row(
-                  children: [
-                    Icon(Icons.notifications),
-                    SizedBox(width: 8),
-                    Text('네이티브 알림 상태'),
-                  ],
-                ),
-              ),
-
-              const PopupMenuItem(
-                value: 'native_10_second_test',
-                child: Row(
-                  children: [
-                    Text('🚨'),
-                    SizedBox(width: 8),
-                    Text('네이티브 10초 테스트'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'native_5_second_test',
-                child: Row(
-                  children: [
-                    Text('⚡'),
-                    SizedBox(width: 8),
-                    Text('네이티브 5초 테스트'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'native_immediate_test',
-                child: Row(
-                  children: [
-                    Text('🔔'),
-                    SizedBox(width: 8),
-                    Text('즉시 네이티브 테스트'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'native_fullscreen_test',
-                child: Row(
-                  children: [
-                    Text('🚨'),
-                    SizedBox(width: 8),
-                    Text('강력한 전체화면 테스트'),
+                    Text('주 시작 요일'),
                   ],
                 ),
               ),
             ],
-          ), // PopupMenuButton 끝
-          IconButton(
-            icon: const Icon(Icons.sync),
-            tooltip: '구글 캘린더 동기화',
-            onPressed: _onSyncWithGoogle,
           ),
-        ], // actions 리스트 종료
+        ],
       ),
       body: Column(
         children: [
-          TableCalendar<Event>(
-            firstDay: DateTime.utc(2020, 1, 1),
-            lastDay: DateTime.utc(2100, 12, 31),
-            focusedDay: _focusedDay,
-            calendarFormat: CalendarFormat.month,
-            selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-            onDaySelected: _onDaySelected,
-            onPageChanged: _onPageChanged,
-            eventLoader: (day) => _events.where((e) => isSameDay(e.startTime, day)).toList(),
+                     TableCalendar<Event>(
+             firstDay: DateTime.utc(2020, 1, 1),
+             lastDay: DateTime.utc(2100, 12, 31),
+             focusedDay: _focusedDay,
+             calendarFormat: CalendarFormat.month,
+             startingDayOfWeek: _startingDayOfWeek,
+             selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+             onDaySelected: _onDaySelected,
+             onPageChanged: _onPageChanged,
+             eventLoader: (day) => _events.where((e) => isSameDay(e.startTime, day)).toList(),
             headerStyle: const HeaderStyle(
               formatButtonVisible: false,
               titleCentered: true,
@@ -919,6 +628,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final selectedMonth = await _showMonthSelectionDialog(selectedYear);
     if (selectedMonth == null) return null;
     
+    // 3단계: 선택 확인
+    final confirmed = await _showConfirmationDialog(selectedYear, selectedMonth);
+    if (confirmed != true) return null;
+    
     return DateTime(selectedYear, selectedMonth, 1);
   }
   
@@ -926,7 +639,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return await showDialog<int>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('동기화할 년도를 선택하세요'),
+        title: const Text('동기화할 날짜를 선택하세요'),
         content: SizedBox(
           width: double.maxFinite,
           height: 300,
@@ -981,7 +694,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return await showDialog<int>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('$selectedYear년 동기화할 월을 선택하세요'),
+        title: Text('$selectedYear년 동기화할 날짜를 선택하세요'),
         content: SizedBox(
           width: double.maxFinite,
           height: 200,
@@ -1027,8 +740,98 @@ class _CalendarScreenState extends State<CalendarScreen> {
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('취소'),
           ),
-        ],
-      ),
-    );
-  }
-} 
+                 ],
+       ),
+     );
+   }
+   
+   Future<bool?> _showConfirmationDialog(int year, int month) async {
+     final monthNames = [
+       '1월', '2월', '3월', '4월', '5월', '6월',
+       '7월', '8월', '9월', '10월', '11월', '12월'
+     ];
+     
+     return await showDialog<bool>(
+       context: context,
+       builder: (context) => AlertDialog(
+         title: const Text('선택 확인'),
+         content: Text('선택하신 날짜가 $year년 ${monthNames[month - 1]}이 맞나요?'),
+         actions: [
+           TextButton(
+             onPressed: () => Navigator.of(context).pop(false),
+             child: const Text('아니요'),
+           ),
+           TextButton(
+             onPressed: () => Navigator.of(context).pop(true),
+             child: const Text('예'),
+           ),
+         ],
+       ),
+     );
+   }
+   
+   Future<void> _showWeekStartDayDialog() async {
+     final settingsService = SettingsService();
+     final currentWeekStartDay = await settingsService.getWeekStartDay();
+     
+     if (!mounted) return;
+     
+     showDialog(
+       context: context,
+       builder: (context) => AlertDialog(
+         title: const Text('주 시작 요일 선택'),
+         content: Column(
+           mainAxisSize: MainAxisSize.min,
+           children: [
+             RadioListTile<int>(
+               title: const Text('일요일'),
+               value: 0,
+               groupValue: currentWeekStartDay,
+                               onChanged: (value) async {
+                  await settingsService.setWeekStartDay(value!);
+                  if (mounted) {
+                    setState(() {
+                      _startingDayOfWeek = StartingDayOfWeek.sunday;
+                    });
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('주 시작 요일이 일요일로 변경되었습니다'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                },
+             ),
+             RadioListTile<int>(
+               title: const Text('월요일'),
+               value: 1,
+               groupValue: currentWeekStartDay,
+                               onChanged: (value) async {
+                  await settingsService.setWeekStartDay(value!);
+                  if (mounted) {
+                    setState(() {
+                      _startingDayOfWeek = StartingDayOfWeek.monday;
+                    });
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('주 시작 요일이 월요일로 변경되었습니다'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                },
+             ),
+           ],
+         ),
+         actions: [
+           TextButton(
+             onPressed: () => Navigator.of(context).pop(),
+             child: const Text('취소'),
+           ),
+         ],
+       ),
+     );
+   }
+ }  
