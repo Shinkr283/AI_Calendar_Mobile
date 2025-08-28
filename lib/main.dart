@@ -21,12 +21,12 @@ import 'screens/home_screen.dart';
 import 'package:intl/date_symbol_data_local.dart';//추가
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
-import 'services/location_service.dart';
+import 'services/location_weather_service.dart';
 import 'services/native_alarm_service.dart';
 import 'services/holiday_service.dart';
 import 'services/chat_prompt_service.dart';
-import 'services/settings_service.dart';
 import 'providers/theme_provider.dart';
+import 'services/settings_service.dart';
 
 
 // 권한 요청 및 현재 위치 조회
@@ -98,7 +98,8 @@ void _initializeBackgroundServices() {
     
     // 위치 서비스 초기화
     try {
-      final pos = await LocationService().getCurrentPosition(accuracy: LocationAccuracy.high);
+      final locationWeatherService = LocationWeatherService();
+      final pos = await locationWeatherService.getCurrentPosition(accuracy: LocationAccuracy.high);
       print('초기 위치: ${pos.latitude}, ${pos.longitude}');
     } catch (e) {
       print('초기 위치 확인 실패: $e');

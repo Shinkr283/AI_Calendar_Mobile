@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../services/weather_service.dart';
+import '../services/location_weather_service.dart';
 import '../services/event_service.dart';
 import '../services/chat_briefing_service.dart';
 import '../services/user_service.dart';
@@ -14,7 +14,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final WeatherService _weatherService = WeatherService();
+  final LocationWeatherService _weatherService = LocationWeatherService();
   final EventService _eventService = EventService();
   final BriefingService _briefingService = BriefingService();
   final UserService _userService = UserService();
@@ -22,6 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, dynamic>? _weatherData;
   List<Event> _todayEvents = [];
   String? _aiRecommendation;
+  String? _currentAddress;
   bool _isLoading = true;
   bool _isAiLoading = false;
 
@@ -81,10 +82,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadWeatherData() async {
     try {
-      final weather = await _weatherService.fetchCurrentLocationWeather();
+      // 위치 정보와 날씨 정보를 함께 가져오기
+      await _weatherService.updateAndSaveCurrentLocation();
+      final weather = await _weatherService.fetchWeatherFromSavedLocation();
+      final address = _weatherService.savedAddress;
+      
       if (mounted) {
         setState(() {
           _weatherData = weather;
+          _currentAddress = address;
         });
       }
     } catch (e) {
@@ -137,6 +143,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final temp = _weatherData!['main']?['temp']?.toString() ?? 'N/A';
     final description = _weatherData!['weather']?[0]?['description'] ?? '날씨 정보 없음';
+    final address = _currentAddress ?? '위치 정보 없음';
 
     return Card(
       margin: const EdgeInsets.all(16),
@@ -144,7 +151,7 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.all(20),
         child: Row(
           children: [
-            // 날씨 아이콘 (텍스트로 대체)
+            // 날씨 아이콘
             Container(
               width: 60,
               height: 60,
@@ -163,12 +170,25 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '현재 날씨',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
-                    ),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on,
+                        size: 16,
+                        color: Colors.grey.shade600,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          address,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey.shade600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -255,12 +275,44 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            event.title,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  event.title,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              if (event.location.isNotEmpty)
+                                Flexible(
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.place,
+                                        size: 16,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          event.location,
+                                          style: TextStyle(
+                                            fontSize: 20,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
                           ),
                           Text(
                             '${DateFormat('HH:mm').format(event.startTime)} - ${DateFormat('HH:mm').format(event.endTime)}',

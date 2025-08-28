@@ -1,8 +1,7 @@
-import 'weather_service.dart';
+import 'location_weather_service.dart';
 import 'package:intl/intl.dart';
 import 'event_service.dart';
 import 'places_service.dart';
-import 'location_service.dart';
 import 'chat_gemini_service.dart';
 
 class ChatWeatherService {
@@ -56,12 +55,14 @@ class ChatWeatherService {
 
   Future<Map<String, dynamic>> _handleGetCurrentLocationWeather() async {
     try {
-      final loc = LocationService();
-      final pos = await loc.getCurrentPosition();
-      final weather = await WeatherService().fetchWeather(pos.latitude, pos.longitude);
+      // 위치정보와 날씨정보는 LocationWeatherService에서 통합 처리
+      final locationWeatherService = LocationWeatherService();
+      final weather = await locationWeatherService.fetchAndSaveLocationWeather();
+      
       if (weather == null) {
         return {'status': '오류: 날씨 정보를 가져오지 못했습니다.'};
       }
+      
       final desc = (weather['weather']?[0]?['description'] ?? '').toString();
       final temp = (weather['main']?['temp'] ?? '').toString();
       return {
@@ -90,7 +91,8 @@ class ChatWeatherService {
     if (place == null) {
       return {'status': '위치 정보를 변환할 수 없습니다.'};
     }
-    final weather = await WeatherService().fetchWeather(place.latitude, place.longitude);
+    final locationWeatherService = LocationWeatherService();
+    final weather = await locationWeatherService.fetchWeather(place.latitude, place.longitude);
     if (weather == null) {
       return {'status': '날씨 정보를 가져오지 못했습니다.'};
     }
@@ -103,12 +105,15 @@ class ChatWeatherService {
   Future<Map<String, dynamic>> _handleGetWeatherByDate(Map<String, dynamic> args) async {
     try {
       final dateStr = args['date'] as String;
-      final loc = LocationService();
-      final pos = await loc.getCurrentPosition();
-      final weather = await WeatherService().fetchWeather(pos.latitude, pos.longitude);
+      
+      // 위치정보와 날씨정보는 LocationWeatherService에서 통합 처리
+      final locationWeatherService = LocationWeatherService();
+      final weather = await locationWeatherService.fetchAndSaveLocationWeather();
+      
       if (weather == null) {
         return {'status': '오류: 날씨 정보를 가져오지 못했습니다.', 'date': dateStr};
       }
+      
       final desc = (weather['weather']?[0]?['description'] ?? '').toString();
       final temp = (weather['main']?['temp'] ?? '').toString();
       return {

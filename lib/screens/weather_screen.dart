@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import '../services/weather_service.dart';
+import '../services/location_weather_service.dart';
 
 class WeatherScreen extends StatefulWidget {
   const WeatherScreen({Key? key}) : super(key: key);
@@ -40,7 +40,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
     );
 
     // 날씨 정보 받아오기 (서비스 사용)
-    final data = await WeatherService().fetchWeather(position.latitude, position.longitude);
+    final data = await LocationWeatherService().fetchWeather(position.latitude, position.longitude);
 
     setState(() {
       weatherData = data;

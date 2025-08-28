@@ -1,9 +1,10 @@
 import 'event_service.dart';
-import 'location_service.dart';
+import 'location_weather_service.dart';
 import 'package:intl/intl.dart';
 
-/// 사용자가 일정의 위치를 조회합니다.
+/// 위치 정보 관련 모든 기능을 담당하는 서비스
 class ChatLocationService {
+final LocationWeatherService _locationWeatherService = LocationWeatherService();
   /// 채팅 텍스트로 장소 관련 질의를 처리하여 응답 문자열을 반환합니다.
   /// 매칭되지 않으면 null을 반환합니다.
   Future<String?> handleLocationQuery(String processedText) async {
@@ -51,9 +52,9 @@ class ChatLocationService {
       final currentLocPattern = RegExp(r'(현재\s*(위치|장소)|내\s*(위치|장소))');
       if (currentLocPattern.hasMatch(processedText)) {
         try {
-          final pos = await LocationService().getCurrentPosition();
-          final address = await LocationService().getAddressFrom(pos);
-          return address.isNotEmpty ? '현재 위치는 $address 입니다.' : '죄송합니다, 현재 위치를 알 수 없습니다.';
+          await _locationWeatherService.updateAndSaveCurrentLocation();
+          final address = _locationWeatherService.savedAddress;
+          return address != null && address.isNotEmpty ? '현재 위치는 $address 입니다.' : '죄송합니다, 현재 위치를 알 수 없습니다.';
         } catch (_) {
           return '죄송합니다, 현재 위치를 알 수 없습니다.';
         }
@@ -69,4 +70,32 @@ class ChatLocationService {
     final loc = events.first.location;
     return loc.isNotEmpty ? '오늘 일정 장소는 $loc 입니다.' : '오늘 일정에 장소 정보가 없습니다.';
   }
+  /// 저장된 위치 정보 반환
+  Map<String, dynamic> getSavedLocationInfo() {
+    return {
+      'latitude': _locationWeatherService.latitude,
+      'longitude': _locationWeatherService.longitude,
+      'address': _locationWeatherService.savedAddress,
+      'lastUpdated': _locationWeatherService.lastUpdated,
+      'hasLocation': _locationWeatherService.hasSavedLocation,
+      'isFresh': _locationWeatherService.isLocationFresh,
+    };
+  }
+
+  /// 현재 위치 업데이트
+  Future<bool> updateCurrentLocation() async {
+    try {
+      await _locationWeatherService.updateAndSaveCurrentLocation();
+      return true;
+    } catch (e) {
+      print('위치 업데이트 실패: $e');
+      return false;
+    }
+  }
+
+  /// 저장된 위치가 있는지 확인
+  bool get hasValidLocation => _locationWeatherService.hasSavedLocation;
+
+  /// 현재 주소 반환
+  String? get currentAddress => _locationWeatherService.savedAddress;
 }

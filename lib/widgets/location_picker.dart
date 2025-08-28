@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import '../services/places_service.dart';
-import '../services/location_service.dart';
+import '../services/location_weather_service.dart';
 
 class LocationPicker extends StatefulWidget {
   final Function(PlaceDetails) onLocationSelected;
@@ -73,7 +73,7 @@ class _LocationPickerState extends State<LocationPicker> {
     });
 
     try {
-      final position = await LocationService().getCurrentPosition();
+      final position = await LocationWeatherService().getCurrentPosition();
       if (mounted) {
         setState(() {
           _currentLocation = LatLng(position.latitude, position.longitude);

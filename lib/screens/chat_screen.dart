@@ -3,10 +3,11 @@ import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 import 'package:provider/provider.dart';
 import '../services/chat_service.dart'; // ChatProvider를 import
-import '../services/weather_service.dart';
+import '../services/chat_weather_service.dart';
 import '../services/places_service.dart';
 import 'map_screen.dart';
 import '../services/chat_briefing_service.dart';
+import '../services/location_weather_service.dart';
 
 class ChatScreen extends StatelessWidget {
   const ChatScreen({super.key});
@@ -75,7 +76,8 @@ class ChatScreen extends StatelessWidget {
                 provider.addUserText(text);
                 final place = await PlacesService.geocodeAddress(location);
                 if (place != null) {
-                  final weather = await WeatherService().fetchWeather(place.latitude, place.longitude);
+                  final locationWeatherService = LocationWeatherService();
+                  final weather = await locationWeatherService.fetchWeather(place.latitude, place.longitude);
                   if (weather != null) {
                     final desc = (weather['weather']?[0]?['description'] ?? '').toString();
                     final temp = (weather['main']?['temp'] ?? '').toString();

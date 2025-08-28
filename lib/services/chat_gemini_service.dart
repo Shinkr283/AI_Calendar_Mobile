@@ -44,27 +44,20 @@ class GeminiService {
 
     final requestBody = {
       'contents': contents,
-      'tools': [
-        {
-          'functionDeclarations': functionDeclarations
-        }
-      ],
+      'tools': [{'functionDeclarations': functionDeclarations}],
       'generationConfig': {
         'temperature': 0.7,
         'topK': 1,
         'topP': 1,
-        'maxOutputTokens': 2048, // increased token limit to prevent truncation
+        'candidateCount': 1,
+        'maxOutputTokens': 4000,
       }
     };
 
     try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode(requestBody),
-      );
+      final response = await http
+        .post(Uri.parse(url), headers: {'Content-Type': 'application/json'}, body: jsonEncode(requestBody))
+        .timeout(const Duration(seconds: 100));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -76,6 +69,31 @@ class GeminiService {
       throw Exception('네트워크 오류: $e');
     }
   }
+
+  // // 스트리밍 형태로 메시지 전송 (단일 응답을 스트림으로 래핑)
+  // Stream<String> sendMessageStream({
+  //   required String message,
+  //   required String systemPrompt,
+  //   required List<Map<String, dynamic>> functionDeclarations,
+  //   List<Map<String, dynamic>> conversationHistory = const [],
+  // }) async* {
+  //   try {
+  //     final resp = await sendMessage(
+  //       message: message,
+  //       systemPrompt: systemPrompt,
+  //       functionDeclarations: functionDeclarations,
+  //       conversationHistory: conversationHistory,
+  //     );
+  //     final text = resp.text;
+  //     if (text != null && text.isNotEmpty) {
+  //       // 현재는 단일 청크로 제공. 필요 시 streamGenerateContent로 확장 가능
+  //       yield text;
+  //     }
+  //   } catch (e) {
+  //     // 스트림 에러 전파
+  //     rethrow;
+  //   }
+  // }
 
   // Function response 전송
   Future<GeminiResponse> sendFunctionResponse({
@@ -128,7 +146,7 @@ class GeminiService {
         'temperature': 0.7,
         'topK': 1,
         'topP': 1,
-        'maxOutputTokens': 2048, // increased token limit
+        'maxOutputTokens': 4000, 
       }
     };
 
