@@ -323,137 +323,129 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('설정'),
-        elevation: 0,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        foregroundColor: Theme.of(context).textTheme.titleLarge?.color,
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // 사용자 정보 섹션
-            _buildUserSection(),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              // 사용자 정보 섹션
+              _buildUserSection(),
 
-
-
-            // 외관 섹션
-            _buildSettingsSection(
-              '외관',
-              [
-                _buildSettingsTile(
-                  icon: _isDarkMode ? Icons.dark_mode : Icons.light_mode,
-                  title: '다크 모드',
-                  subtitle: _isDarkMode ? '어두운 테마' : '밝은 테마',
-                  trailing: Switch(
-                    value: _isDarkMode,
-                    onChanged: (value) async {
-                      setState(() {
-                        _isDarkMode = value;
-                      });
-                      
-                      // ThemeProvider를 통해 테마 변경
-                      await context.read<ThemeProvider>().setTheme(value);
-                      await _saveSettings();
-                      
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(_isDarkMode ? '다크 모드가 활성화되었습니다' : '라이트 모드가 활성화되었습니다'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
-
-            // 알림 섹션
-            _buildSettingsSection(
-              '알림',
-              [
-                _buildSettingsTile(
-                  icon: Icons.notifications,
-                  title: '하루 일정 알림',
-                  subtitle: _isDailyNotificationEnabled 
-                      ? '매일 ${_notificationTime.format(context)}에 알림'
-                      : '알림 꺼짐',
-                  trailing: Switch(
-                    value: _isDailyNotificationEnabled,
-                    onChanged: (value) async {
-                      setState(() {
-                        _isDailyNotificationEnabled = value;
-                      });
-                      await _saveSettings();
-                      
-                      // 즉시 알림 예약/취소
-                      if (value) {
-                        await SettingsService().setIsDailyNotificationEnabled(true);
+              // 외관 섹션
+              _buildSettingsSection(
+                '외관',
+                [
+                  _buildSettingsTile(
+                    icon: _isDarkMode ? Icons.dark_mode : Icons.light_mode,
+                    title: '다크 모드',
+                    subtitle: _isDarkMode ? '어두운 테마' : '밝은 테마',
+                    trailing: Switch(
+                      value: _isDarkMode,
+                      onChanged: (value) async {
+                        setState(() {
+                          _isDarkMode = value;
+                        });
+                        
+                        // ThemeProvider를 통해 테마 변경
+                        await context.read<ThemeProvider>().setTheme(value);
+                        await _saveSettings();
+                        
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('하루 일정 알림이 활성화되었습니다'),
+                            SnackBar(
+                              content: Text(_isDarkMode ? '다크 모드가 활성화되었습니다' : '라이트 모드가 활성화되었습니다'),
                               backgroundColor: Colors.green,
                             ),
                           );
                         }
-                      } else {
-                        await SettingsService().setIsDailyNotificationEnabled(false);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+
+              // 알림 섹션
+              _buildSettingsSection(
+                '알림',
+                [
+                  _buildSettingsTile(
+                    icon: Icons.notifications,
+                    title: '하루 일정 알림',
+                    subtitle: _isDailyNotificationEnabled 
+                        ? '매일 ${_notificationTime.format(context)}에 알림'
+                        : '알림 꺼짐',
+                    trailing: Switch(
+                      value: _isDailyNotificationEnabled,
+                      onChanged: (value) async {
+                        setState(() {
+                          _isDailyNotificationEnabled = value;
+                        });
+                        await _saveSettings();
+                        
+                        // 즉시 알림 예약/취소
+                        if (value) {
+                          await SettingsService().setIsDailyNotificationEnabled(true);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('하루 일정 알림이 활성화되었습니다'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        } else {
+                          await SettingsService().setIsDailyNotificationEnabled(false);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('하루 일정 알림이 비활성화되었습니다'),
+                                backgroundColor: Colors.orange,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                    iconColor: _isDailyNotificationEnabled ? Colors.orange : Colors.grey,
+                  ),
+                  if (_isDailyNotificationEnabled)
+                    _buildSettingsTile(
+                      icon: Icons.access_time,
+                      title: '알림 시간 설정',
+                      subtitle: _notificationTime.format(context),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: _selectNotificationTime,
+                    ),
+                  _buildSettingsTile(
+                    icon: Icons.preview,
+                    title: '알림 미리보기',
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () async {
+                      try {
+                        // 즉시 실제 기기 알림 발송
+                        await NativeAlarmService.scheduleNativeAlarm(
+                          title: '📅 AI 캘린더 - 오늘의 일정',
+                          body: '회의 3개, 약속 1개가 있습니다. 일정을 확인해보세요!',
+                          delaySeconds: 0, // 즉시 알림
+                          notificationId: 9999, // 미리보기 전용 ID
+                        );
+                      } catch (e) {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('하루 일정 알림이 비활성화되었습니다'),
-                              backgroundColor: Colors.orange,
+                            SnackBar(
+                              content: Text('알림 미리보기 실패: $e'),
+                              backgroundColor: Colors.red,
                             ),
                           );
                         }
                       }
                     },
                   ),
-                  iconColor: _isDailyNotificationEnabled ? Colors.orange : Colors.grey,
-                ),
-                if (_isDailyNotificationEnabled)
-                  _buildSettingsTile(
-                    icon: Icons.access_time,
-                    title: '알림 시간 설정',
-                    subtitle: _notificationTime.format(context),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: _selectNotificationTime,
-                  ),
-                _buildSettingsTile(
-                  icon: Icons.preview,
-                  title: '알림 미리보기',
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () async {
-                    try {
-                      // 즉시 실제 기기 알림 발송
-                      await NativeAlarmService.scheduleNativeAlarm(
-                        title: '📅 AI 캘린더 - 오늘의 일정',
-                        body: '회의 3개, 약속 1개가 있습니다. 일정을 확인해보세요!',
-                        delaySeconds: 0, // 즉시 알림
-                        notificationId: 9999, // 미리보기 전용 ID
-                      );
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('알림 미리보기 실패: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    }
-                  },
-                ),
-              ],
-            ),
+                ],
+              ),
 
-
-
-            const SizedBox(height: 20),
-          ],
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );

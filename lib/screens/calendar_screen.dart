@@ -281,46 +281,55 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('캘린더'),
-        centerTitle: true,
-        actions: [
-          PopupMenuButton<String>(
-            onSelected: (value) async {
-              if (value == 'sync_google_calendar') {
-                _onSyncWithGoogle();
-              } else if (value == 'week_start_day') {
-                _showWeekStartDayDialog();
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'sync_google_calendar',
-                child: Row(
-                  children: [
-                    Icon(Icons.sync),
-                    SizedBox(width: 8),
-                    Text('구글 캘린더 일정 동기화'),
-                  ],
-                ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // 상단 메뉴 버튼
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  PopupMenuButton<String>(
+                    onSelected: (value) async {
+                      if (value == 'sync_google_calendar') {
+                        _onSyncWithGoogle();
+                      } else if (value == 'week_start_day') {
+                        _showWeekStartDayDialog();
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'sync_google_calendar',
+                        child: Row(
+                          children: [
+                            Icon(Icons.sync),
+                            SizedBox(width: 8),
+                            Text('구글 캘린더 일정 동기화'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'week_start_day',
+                        child: Row(
+                          children: [
+                            Icon(Icons.calendar_view_week),
+                            SizedBox(width: 8),
+                            Text('주 시작 요일'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              const PopupMenuItem(
-                value: 'week_start_day',
-                child: Row(
-                  children: [
-                    Icon(Icons.calendar_view_week),
-                    SizedBox(width: 8),
-                    Text('주 시작 요일'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-                     TableCalendar<Event>(
+            ),
+            
+            // 캘린더
+            Expanded(
+              child: Column(
+                children: [
+                  TableCalendar<Event>(
              firstDay: DateTime.utc(2020, 1, 1),
              lastDay: DateTime.utc(2100, 12, 31),
              focusedDay: _focusedDay,
@@ -569,8 +578,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           );
                         },
                       ),
-          ),
-        ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _onAddEvent,
