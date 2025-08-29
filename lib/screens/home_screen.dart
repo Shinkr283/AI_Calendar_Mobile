@@ -3,7 +3,10 @@ import 'package:intl/intl.dart';
 import '../services/location_weather_service.dart';
 import '../services/event_service.dart';
 import '../services/chat_briefing_service.dart';
+import '../services/chat_service.dart';
 import '../models/event.dart';
+import '../widgets/event_form.dart';
+import 'chat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -113,78 +116,313 @@ class _HomeScreenState extends State<HomeScreen> {
     return '좋은 저녁이에요!';
   }
 
-  Widget _buildWeatherCard() {
-    if (_weatherData == null) {
-      return _buildLoadingCard('날씨 정보를 불러오는 중...');
-    }
+  // 일정이 지났는지 확인하는 함수
+  bool _isEventPast(Event event) {
+    return event.endTime.isBefore(DateTime.now());
+  }
 
-    final temp = _weatherData!['main']?['temp']?.toString() ?? 'N/A';
-    final description = _weatherData!['weather']?[0]?['description'] ?? '날씨 정보 없음';
-    final address = _currentAddress ?? '위치 정보 없음';
+  // 일정을 터치했을 때 AI와 대화 시작
+  void _onEventTap(Event event) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // 드래그 핸들
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // AI 채팅 화면
+              Expanded(
+                child: ChatScreen(
+                  initialEvent: event,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
+  // 일정 편집 다이얼로그
+  void _onEventEdit(Event event) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.8,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    '일정 편집',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const Divider(),
+              Expanded(
+                child: EventForm(
+                  initialEvent: event,
+                  onSave: (updatedEvent, alarmMinutesBefore) async {
+                    try {
+                      await _eventService.updateEvent(updatedEvent);
+                      await _loadTodayEvents(); // 일정 목록 새로고침
+                      if (mounted) {
+                        Navigator.of(context).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('일정이 수정되었습니다.')),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('일정 수정 실패: $e')),
+                        );
+                      }
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 일정 삭제 확인 다이얼로그
+  void _onEventDelete(Event event) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('일정 삭제'),
+        content: Text('${event.title} 일정을 삭제하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () async {
+              try {
+                await _eventService.deleteEvent(event.id!);
+                await _loadTodayEvents(); // 일정 목록 새로고침
+                if (mounted) {
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('일정이 삭제되었습니다.')),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('일정 삭제 실패: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('삭제', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeatherAndAiCard() {
     return Card(
       margin: const EdgeInsets.all(16),
       child: Padding(
         padding: const EdgeInsets.all(20),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 날씨 아이콘
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: Colors.blue.shade100,
-                borderRadius: BorderRadius.circular(30),
-              ),
-              child: const Icon(
-                Icons.wb_sunny,
-                size: 30,
-                color: Colors.orange,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            // 날씨 정보 섹션
+            if (_weatherData != null) ...[
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        size: 16,
-                        color: Colors.grey.shade600,
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          address,
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey.shade600,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '$temp°C',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+                  // 날씨 아이콘
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade100,
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: const Icon(
+                      Icons.wb_sunny,
+                      size: 30,
+                      color: Colors.orange,
                     ),
                   ),
-                  Text(
-                    description,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey.shade700,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on,
+                              size: 16,
+                              color: Colors.grey.shade600,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                _currentAddress ?? '위치 정보 없음',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey.shade600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${_weatherData!['main']?['temp']?.toString() ?? 'N/A'}°C',
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          _weatherData!['weather']?[0]?['description'] ?? '날씨 정보 없음',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
+              const SizedBox(height: 20),
+            ] else ...[
+              // 날씨 로딩 상태
+              Row(
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: const Icon(
+                      Icons.wb_sunny,
+                      size: 30,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '날씨 정보를 불러오는 중...',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+            
+            // AI 추천 섹션
+            Row(
+              children: [
+                const Icon(Icons.psychology, color: Colors.purple),
+                const SizedBox(width: 8),
+                const Text(
+                  'AI 비서 추천',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                if (_isAiLoading)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'AI 분석 중...',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
             ),
+            const SizedBox(height: 16),
+            if (_aiRecommendation == null && !_isAiLoading)
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'AI가 오늘 일정을 분석하고 있습니다...',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              )
+            else if (_aiRecommendation != null)
+              Text(
+                _aiRecommendation!,
+                style: const TextStyle(
+                  fontSize: 16,
+                  height: 1.5,
+                ),
+              ),
           ],
         ),
       ),
@@ -235,169 +473,95 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               )
             else
-              ..._todayEvents.take(3).map((event) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: Colors.blue,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+              ..._todayEvents.map((event) {
+                final isPast = _isEventPast(event);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: InkWell(
+                    onTap: () => _onEventTap(event),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
                         children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
+                          // 파란색 점 (이전 디자인)
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: isPast ? Colors.grey.shade400 : Colors.blue,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // 일정 내용
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
                                   event.title,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w500,
+                                    color: isPast ? Colors.grey.shade400 : Colors.black87,
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
+                                Text(
+                                  '${DateFormat('HH:mm').format(event.startTime)} - ${DateFormat('HH:mm').format(event.endTime)}',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: isPast ? Colors.grey.shade400 : Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // 편집 버튼 (지난 일정이 아닌 경우에만 표시)
+                          if (!isPast)
+                            PopupMenuButton<String>(
+                              icon: Icon(
+                                Icons.edit,
+                                size: 20,
+                                color: Colors.grey.shade600,
                               ),
-                              const SizedBox(width: 8),
-                              if (event.location.isNotEmpty)
-                                Flexible(
+                              onSelected: (value) {
+                                if (value == 'edit') {
+                                  _onEventEdit(event);
+                                } else if (value == 'delete') {
+                                  _onEventDelete(event);
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                const PopupMenuItem(
+                                  value: 'edit',
                                   child: Row(
                                     children: [
-                                      Icon(
-                                        Icons.place,
-                                        size: 16,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Expanded(
-                                        child: Text(
-                                          event.location,
-                                          style: TextStyle(
-                                            fontSize: 20,
-                                            color: Colors.grey.shade600,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
+                                      Icon(Icons.edit, size: 16),
+                                      SizedBox(width: 8),
+                                      Text('수정'),
                                     ],
                                   ),
                                 ),
-                            ],
-                          ),
-                          Text(
-                            '${DateFormat('HH:mm').format(event.startTime)} - ${DateFormat('HH:mm').format(event.endTime)}',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.delete, size: 16, color: Colors.red),
+                                      SizedBox(width: 8),
+                                      Text('삭제', style: TextStyle(color: Colors.red)),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
                         ],
                       ),
                     ),
-                  ],
-                ),
-              )),
-            if (_todayEvents.length > 3)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  '그 외 ${_todayEvents.length - 3}개 일정 더...',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.blue.shade600,
                   ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAiRecommendationCard() {
-    return Card(
-      margin: const EdgeInsets.all(16),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.psychology, color: Colors.purple),
-                const SizedBox(width: 8),
-                const Text(
-                  'AI 비서 추천',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                if (_isAiLoading)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'AI 분석 중...',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (_aiRecommendation == null)
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'AI가 오늘 일정을 분석하고 있습니다...',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              Text(
-                _aiRecommendation!,
-                style: const TextStyle(
-                  fontSize: 16,
-                  height: 1.5,
-                ),
-              ),
+                );
+              }),
           ],
         ),
       ),
@@ -477,13 +641,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     
                     // 날씨 카드
-                    _buildWeatherCard(),
+                    _buildWeatherAndAiCard(),
                     
                     // 오늘 일정 카드
                     _buildTodayEventsCard(),
-                    
-                    // AI 추천 카드
-                    _buildAiRecommendationCard(),
                     
                     const SizedBox(height: 20),
                   ],
