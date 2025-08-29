@@ -29,6 +29,8 @@ class _EventFormState extends State<EventForm> {
   PlaceDetails? _selectedPlace;
   int _alarmMinutesBefore = 10; // 기본값 10분 전
   final List<int> _alarmOptions = [0, 5, 10, 15, 30, 60, 120];
+  int _priority = 0; // 우선순위 기본값 0
+  final List<int> _priorityOptions = [0, 1, 2, 3, 4, 5];
 
   @override
   void initState() {
@@ -61,6 +63,7 @@ class _EventFormState extends State<EventForm> {
     
     _location = e?.location ?? '';
     _alarmMinutesBefore = e?.alarmMinutesBefore ?? 10; // 기존 일정의 알림 시간 복원
+    _priority = e?.priority ?? 0; // 기존 일정의 우선순위 복원
 
      // 🗺️ 저장된 좌표가 있다면 PlaceDetails 생성
     if (e?.locationLatitude != null && e?.locationLongitude != null && e!.location.isNotEmpty) {
@@ -200,6 +203,7 @@ class _EventFormState extends State<EventForm> {
         locationLongitude: _selectedPlace?.longitude,
         isCompleted: false,
         alarmMinutesBefore: _alarmMinutesBefore,
+        priority: _priority,
         createdAt: widget.initialEvent?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
       );
@@ -293,7 +297,42 @@ class _EventFormState extends State<EventForm> {
               ],
             ),
             const SizedBox(height: 8),
-            // 카테고리 / 우선순위 UI 잠시 비활성화
+            // 우선순위 설정
+            DropdownButtonFormField<int>(
+              value: _priority,
+              decoration: const InputDecoration(labelText: '우선순위'),
+              items: _priorityOptions
+                  .map((p) => DropdownMenuItem(
+                        value: p,
+                        child: Row(
+                          children: [
+                            if (p == 0)
+                              const SizedBox.shrink()
+                            else
+                              Row(
+                                children: List.generate(
+                                  p,
+                                  (index) => Icon(
+                                    Icons.star,
+                                    color: Colors.amber,
+                                    size: 20,
+                                  ),
+                                ),
+                              ),
+                            if (p != 0) const SizedBox(width: 8),
+                            Text(
+                              p == 0 ? '보통' : '',
+                              style: TextStyle(
+                                color: p == 0 ? Colors.grey : Colors.black,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ))
+                  .toList(),
+              onChanged: (v) => setState(() => _priority = v ?? 0),
+            ),
+            const SizedBox(height: 8),
             // 알림 시간 설정
             DropdownButtonFormField<int>(
               value: _alarmMinutesBefore,
