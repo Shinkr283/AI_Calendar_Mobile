@@ -2,6 +2,7 @@
 import '../models/chat_mbti.dart';
 import 'user_service.dart';
 import 'chat_gemini_service.dart';
+import 'chat_prompt_service.dart';
 
 class MbtiService {
   static final MbtiService _instance = MbtiService._internal();
@@ -11,7 +12,7 @@ class MbtiService {
   // MBTI 관련 Function declaration
   static const Map<String, dynamic> setMbtiFunction = {
     'name': 'setMbtiType',
-    'description': '사용자의 MBTI 유형을 설정하고, 그에 맞는 AI 챗봇 페르소나를 적용합니다.',
+    'description': '사용자의 MBTI 유형을 설정하고, 그에 맞는 AI 챗봇의 성격을 적용합니다.',
     'parameters': {
       'type': 'object',
       'properties': {
@@ -49,6 +50,10 @@ class MbtiService {
       try {
         final userService = UserService();
         await userService.setMBTIType(mbti.toUpperCase());
+        
+        // PromptService 캐시 업데이트
+        await PromptService().updateMbti(mbti.toUpperCase());
+        
         return {'status': '성공적으로 ${mbti.toUpperCase()}로 설정되었습니다. 이제 새로운 성격으로 대화하겠습니다.'};
       } catch (e) {
         return {'status': '오류: MBTI를 설정하는 동안 데이터베이스에 문제가 발생했습니다.'};
@@ -60,13 +65,9 @@ class MbtiService {
 
   // 현재 사용자의 MBTI 유형 가져오기
   Future<String> getCurrentMbtiType() async {
-    try {
-      final userService = UserService();
-      final user = await userService.getCurrentUser();
-      return user?.mbtiType ?? 'INFP';
-    } catch (e) {
-      return 'INFP'; // 기본값
-    }
+    final userService = UserService();
+    final user = await userService.getCurrentUser();
+    return user?.mbtiType ?? 'INFP';
   }
 
   // MBTI 프로필 정보 가져오기

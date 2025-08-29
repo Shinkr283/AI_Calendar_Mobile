@@ -3,7 +3,6 @@ import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 import 'package:provider/provider.dart';
 import '../services/chat_service.dart'; // ChatProvider를 import
-import '../services/chat_weather_service.dart';
 import '../services/places_service.dart';
 import 'map_screen.dart';
 import '../services/chat_briefing_service.dart';

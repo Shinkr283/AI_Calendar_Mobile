@@ -6,7 +6,6 @@ import 'dart:convert';
 import 'dart:async';
 import 'dart:math';
 import 'package:intl/intl.dart';
-import 'user_service.dart';
 import 'chat_mbti_service.dart';
 import 'chat_schedule_service.dart';
 import 'chat_schedule_update.dart';
@@ -160,7 +159,7 @@ class ChatProvider with ChangeNotifier {
   final List<types.Message> _messages = [];
   final List<Map<String, dynamic>> _conversationHistory = [];
   bool _isLoading = false;
-  String _currentUserMbti = 'INFP';
+  String _currentUserMbti = '';
 
   // 사용자 정의
   final _user = const types.User(id: 'user');
@@ -217,6 +216,9 @@ class ChatProvider with ChangeNotifier {
       'getWeatherByDate': (call) => _weatherService.handleFunctionCall(call),
       'getWeatherForTodayEvent': (call) => _weatherService.handleFunctionCall(call),
       
+      // 장소 관련
+      'handleLocationQuery': (call) => ChatLocationService().handleLocationQuery(call.args['location'] as String),
+
       // 맛집 추천 관련
       'getNearbyRestaurants': (call) => _recommendService.handleFunctionCall(call),
     };
@@ -227,7 +229,9 @@ class ChatProvider with ChangeNotifier {
     _setLoading(true);
 
     try {
-      await _initializeUser();
+      // PromptService 초기화 (MBTI 캐싱)
+      await _promptService.initialize();
+      
       await _showWelcomeMessage();
     } catch (e) {
       _addErrorMessage('AI 비서 초기화 중 오류가 발생했습니다: $e');
@@ -235,24 +239,9 @@ class ChatProvider with ChangeNotifier {
       _setLoading(false);
     }
   }
-
-  /// 사용자 초기화
-  Future<void> _initializeUser() async {
-    final userService = UserService();
-    var user = await userService.getCurrentUser();
-
-    user ??= await userService.createUser(
-      name: '사용자',
-      email: 'user@example.com',
-      mbtiType: 'INFP',
-    );
-    
-    _currentUserMbti = user.mbtiType ?? 'INFP';
-  }
-
   /// 환영 메시지 표시
   Future<void> _showWelcomeMessage() async {
-    final systemPrompt = _promptService.createSystemPrompt(_currentUserMbti);
+    final systemPrompt = await _promptService.createSystemPrompt();
     final functionDeclarations = _getAllFunctionDeclarations();
 
     try {
@@ -320,7 +309,7 @@ class ChatProvider with ChangeNotifier {
 
   /// AI 응답 처리
   Future<void> _processAIResponse(String text) async {
-    final systemPrompt = _promptService.createSystemPrompt(_currentUserMbti);
+    final systemPrompt = await _promptService.createSystemPrompt();
     final functionDeclarations = _getAllFunctionDeclarations();
 
     final response = await _geminiService.sendMessage(
@@ -352,7 +341,7 @@ class ChatProvider with ChangeNotifier {
       final followUpResponse = await _geminiService.sendFunctionResponse(
         functionName: call.name,
         functionResult: result,
-        systemPrompt: _promptService.createSystemPrompt(_currentUserMbti),
+        systemPrompt: await _promptService.createSystemPrompt(),
         functionDeclarations: _getAllFunctionDeclarations(),
         conversationHistory: _conversationHistory,
       );

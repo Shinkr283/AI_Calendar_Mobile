@@ -3,7 +3,6 @@ import 'package:intl/intl.dart';
 import '../services/location_weather_service.dart';
 import '../services/event_service.dart';
 import '../services/chat_briefing_service.dart';
-import '../services/user_service.dart';
 import '../models/event.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -17,7 +16,6 @@ class _HomeScreenState extends State<HomeScreen> {
   final LocationWeatherService _weatherService = LocationWeatherService();
   final EventService _eventService = EventService();
   final BriefingService _briefingService = BriefingService();
-  final UserService _userService = UserService();
   
   Map<String, dynamic>? _weatherData;
   List<Event> _todayEvents = [];
@@ -40,9 +38,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      // 사용자 정보 로드 (MBTI 가져오기)
-      await _loadUserInfo();
-      
       // 날씨 정보 로드 (빠른 로딩)
       _loadWeatherData();
       
@@ -61,23 +56,6 @@ class _HomeScreenState extends State<HomeScreen> {
     
     // AI 추천은 별도로 비동기 로드 (화면이 먼저 표시된 후)
     _loadAiRecommendation();
-  }
-
-  Future<void> _loadUserInfo() async {
-    try {
-      var user = await _userService.getCurrentUser();
-      
-      // 앱 최초 실행 시 사용자가 없으면 기본 사용자를 생성
-      user ??= await _userService.createUser(
-        name: '사용자',
-        email: 'user@example.com',
-        mbtiType: 'INFP',
-      );
-      
-      // MBTI는 BriefingService에서 직접 처리
-    } catch (e) {
-      print('사용자 정보 로드 실패: $e');
-    }
   }
 
   Future<void> _loadWeatherData() async {
@@ -127,7 +105,6 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) setState(() => _isAiLoading = false);
     }
   }
-  // _buildSimplePrompt 제거 (ChatBriefingService 사용)
 
   String _getGreeting() {
     final hour = DateTime.now().hour;

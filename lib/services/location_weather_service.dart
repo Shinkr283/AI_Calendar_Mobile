@@ -132,9 +132,7 @@ class LocationWeatherService {
         position.latitude,
         position.longitude,
       );
-      
       if (placemarks.isEmpty) return '';
-      
       final p = placemarks.first;
       final parts = <String>[
         if (_isValidString(p.administrativeArea)) p.administrativeArea!,

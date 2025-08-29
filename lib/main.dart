@@ -31,7 +31,6 @@ import 'services/settings_service.dart';
 
 // 권한 요청 및 현재 위치 조회
 // 위치 권한 및 현재 위치는 LocationService에서 처리합니다.
-
 // KstTime 클래스 제거됨 (네이티브 알림 사용으로 더 이상 필요없음)
 
 void main() async {
@@ -112,11 +111,10 @@ void _initializeBackgroundServices() {
       print('공휴일 로드 실패: $e');
     }
 
-    // MBTI 기반 시스템 프롬프트를 앱 시작 시 미리 생성합니다
     try {
-      final currentUser = await UserService().getCurrentUser();
-      final mbti = currentUser?.mbtiType ?? 'INFP';
-      PromptService().createSystemPrompt(mbti);
+      await UserService().getCurrentUser();
+      PromptService().createSystemPrompt();
+      await PromptService().initialize();
     } catch (_) {}
 
     // 하루 일정 알림 복원

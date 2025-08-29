@@ -9,7 +9,7 @@ class GeminiService {
 
   final String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
-  // 메시지 전송 (Function calling 지원)
+  // 메시지 전송
   Future<GeminiResponse> sendMessage({
     required String message,
     required String systemPrompt,
@@ -17,10 +17,8 @@ class GeminiService {
     List<Map<String, dynamic>> conversationHistory = const [],
   }) async {
     final apiKey = ApiKeys.geminiApiKey;
-    
     final url = '$_baseUrl?key=$apiKey';
     
-    // 대화 히스토리 구성
     final contents = <Map<String, dynamic>>[];
     
     // 시스템 프롬프트 추가
@@ -29,14 +27,14 @@ class GeminiService {
       'role': 'user'
     });
     contents.add({
-      'parts': [{'text': '네, 알겠습니다. 해당 역할과 성격으로 대화하겠습니다.'}],
+      'parts': [{'text': '네, 알겠습니다.'}],
       'role': 'model'
     });
 
-    // 기존 대화 히스토리 추가
+    // 대화 히스토리 추가
     contents.addAll(conversationHistory);
     
-    // 현재 사용자 메시지 추가
+    // 현재 메시지 추가
     contents.add({
       'parts': [{'text': message}],
       'role': 'user'
@@ -57,43 +55,18 @@ class GeminiService {
     try {
       final response = await http
         .post(Uri.parse(url), headers: {'Content-Type': 'application/json'}, body: jsonEncode(requestBody))
-        .timeout(const Duration(seconds: 100));
+        .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return GeminiResponse.fromJson(data);
       } else {
-        throw Exception('Gemini API 호출 실패: ${response.statusCode} - ${response.body}');
+        throw Exception('API 호출 실패: ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('네트워크 오류: $e');
     }
   }
-
-  // // 스트리밍 형태로 메시지 전송 (단일 응답을 스트림으로 래핑)
-  // Stream<String> sendMessageStream({
-  //   required String message,
-  //   required String systemPrompt,
-  //   required List<Map<String, dynamic>> functionDeclarations,
-  //   List<Map<String, dynamic>> conversationHistory = const [],
-  // }) async* {
-  //   try {
-  //     final resp = await sendMessage(
-  //       message: message,
-  //       systemPrompt: systemPrompt,
-  //       functionDeclarations: functionDeclarations,
-  //       conversationHistory: conversationHistory,
-  //     );
-  //     final text = resp.text;
-  //     if (text != null && text.isNotEmpty) {
-  //       // 현재는 단일 청크로 제공. 필요 시 streamGenerateContent로 확장 가능
-  //       yield text;
-  //     }
-  //   } catch (e) {
-  //     // 스트림 에러 전파
-  //     rethrow;
-  //   }
-  // }
 
   // Function response 전송
   Future<GeminiResponse> sendFunctionResponse({
@@ -104,25 +77,11 @@ class GeminiService {
     required List<Map<String, dynamic>> conversationHistory,
   }) async {
     final apiKey = ApiKeys.geminiApiKey;
-
     final url = '$_baseUrl?key=$apiKey';
     
     final contents = <Map<String, dynamic>>[];
-    
-    // 시스템 프롬프트 추가
-    contents.add({
-      'parts': [{'text': systemPrompt}],
-      'role': 'user'
-    });
-    contents.add({
-      'parts': [{'text': '네, 알겠습니다. 해당 역할과 성격으로 대화하겠습니다.'}],
-      'role': 'model'
-    });
-
-    // 기존 대화 히스토리 추가
     contents.addAll(conversationHistory);
     
-    // Function response 추가
     contents.add({
       'parts': [
         {
@@ -137,11 +96,7 @@ class GeminiService {
 
     final requestBody = {
       'contents': contents,
-      'tools': [
-        {
-          'functionDeclarations': functionDeclarations
-        }
-      ],
+      'tools': [{'functionDeclarations': functionDeclarations}],
       'generationConfig': {
         'temperature': 0.7,
         'topK': 1,
@@ -153,9 +108,7 @@ class GeminiService {
     try {
       final response = await http.post(
         Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: {'Content-Type': 'application/json'},
         body: jsonEncode(requestBody),
       );
 
@@ -163,7 +116,7 @@ class GeminiService {
         final data = jsonDecode(response.body);
         return GeminiResponse.fromJson(data);
       } else {
-        throw Exception('Gemini API 호출 실패: ${response.statusCode} - ${response.body}');
+        throw Exception('API 호출 실패: ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('네트워크 오류: $e');
@@ -183,9 +136,7 @@ class GeminiResponse {
 
   factory GeminiResponse.fromJson(Map<String, dynamic> json) {
     final candidates = json['candidates'] as List<dynamic>? ?? [];
-    if (candidates.isEmpty) {
-      return GeminiResponse();
-    }
+    if (candidates.isEmpty) return GeminiResponse();
 
     final candidate = candidates.first as Map<String, dynamic>;
     final content = candidate['content'] as Map<String, dynamic>? ?? {};
@@ -205,10 +156,7 @@ class GeminiResponse {
       }
     }
 
-    return GeminiResponse(
-      text: text,
-      functionCalls: functionCalls,
-    );
+    return GeminiResponse(text: text, functionCalls: functionCalls);
   }
 }
 
@@ -217,10 +165,7 @@ class GeminiFunctionCall {
   final String name;
   final Map<String, dynamic> args;
 
-  GeminiFunctionCall({
-    required this.name,
-    required this.args,
-  });
+  GeminiFunctionCall({required this.name, required this.args});
 
   factory GeminiFunctionCall.fromJson(Map<String, dynamic> json) {
     return GeminiFunctionCall(
