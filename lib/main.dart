@@ -119,7 +119,7 @@ void _initializeBackgroundServices() {
     } catch (e) {
       print('공휴일 로드 실패: $e');
     }
-    
+
     // 하루 일정 알림 복원
     try {
       await SettingsService().restoreDailyNotification();

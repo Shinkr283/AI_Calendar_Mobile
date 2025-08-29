@@ -1,14 +1,94 @@
 import 'package:intl/intl.dart';
+import 'dart:async';
 import 'event_service.dart';
 import 'location_weather_service.dart';
 import 'chat_service.dart';
 
+/// 브리핑 요청 취소 예외
+class CancellationException implements Exception {
+  final String message;
+  CancellationException(this.message);
+
+  @override
+  String toString() => message;
+}
+
 /// 특정 날짜에 대한 브리핑 텍스트를 생성합니다.
 class BriefingService {
-  
-    /// [date]에 해당하는 브리핑을 생성하여 반환합니다.
+  // 중복 요청 방지를 위한 변수들
+  DateTime? _lastRequestDate;
+  Future<String>? _currentRequest;
+  Completer<void>? _cancelCompleter;
+
+  /// 중복 요청 시 이전 요청을 취소하고 최신 요청만 처리합니다.
   Future<String> getBriefingForDate(DateTime date) async {
+    // 중복 요청 체크 및 취소
+    if (_currentRequest != null && _cancelCompleter != null) {
+      print('🔄 브리핑 중복 요청 감지: 이전 요청 취소하고 새 요청 처리');
+
+      // 이전 요청 취소 신호 전송
+      if (!_cancelCompleter!.isCompleted) {
+        _cancelCompleter!.complete();
+      }
+
+      // 이전 요청이 완전히 취소될 때까지 잠시 대기
+      try {
+        await _currentRequest!.timeout(Duration(milliseconds: 100));
+      } catch (e) {
+        // 타임아웃이나 취소 예외는 무시
+      }
+
+      // 상태 초기화
+      _currentRequest = null;
+      _cancelCompleter = null;
+    }
+
+    // 새로운 취소 토큰 생성
+    _cancelCompleter = Completer<void>();
+    final cancelCompleter = _cancelCompleter!;
+
+    // 현재 요청을 저장
+    _currentRequest = _generateBriefing(date, cancelCompleter);
+    _lastRequestDate = date;
+
     try {
+      final result = await _currentRequest!;
+
+      // 요청이 완료되면 현재 요청 초기화 (해당 날짜 요청만)
+      if (_lastRequestDate == date) {
+        _currentRequest = null;
+        _cancelCompleter = null;
+      }
+
+      return result;
+    } catch (e) {
+      // 요청이 완료되면 현재 요청 초기화 (해당 날짜 요청만)
+      if (_lastRequestDate == date) {
+        _currentRequest = null;
+        _cancelCompleter = null;
+      }
+
+      // 취소 예외는 무시하고 빈 결과 반환
+      if (e is CancellationException) {
+        print('🔄 브리핑 요청이 취소되었습니다: ${e.message}');
+        return '';
+      }
+
+      rethrow;
+    }
+  }
+
+  /// 실제 브리핑 생성 로직
+  Future<String> _generateBriefing(
+    DateTime date,
+    Completer<void> cancelCompleter,
+  ) async {
+    try {
+      // 시작 시 취소 확인
+      if (cancelCompleter.isCompleted) {
+        throw CancellationException('브리핑 요청이 취소되었습니다.');
+      }
+
       // 날짜 텍스트 (즉시 생성)
       final dateStr = DateFormat('yyyy년 MM월 dd일 EEEE', 'ko_KR').format(date);
 
@@ -17,11 +97,13 @@ class BriefingService {
       final eventsFuture = EventService().getEventsForDate(date);
       final locationFuture = locationWeather.updateAndSaveCurrentLocation();
 
-      await Future.wait([
-        locationFuture,
-        eventsFuture,
-      ], eagerError: false);
-      
+      await Future.wait([locationFuture, eventsFuture], eagerError: false);
+
+      // 취소 확인 - 병렬 작업 후
+      if (cancelCompleter.isCompleted) {
+        throw CancellationException('브리핑 요청이 취소되었습니다.');
+      }
+
       final address = locationWeather.savedAddress ?? '';
 
       // 🚀 위치 기반 날씨 조회 (위치가 있을 때만)
@@ -30,27 +112,61 @@ class BriefingService {
       try {
         print('🌤️ 날씨 정보 조회 시작...');
         if (locationWeather.hasSavedLocation) {
-          print('📍 위치 좌표: ${locationWeather.latitude}, ${locationWeather.longitude}');
-          final weatherData = await locationWeather.fetchWeatherFromSavedLocation();
+          print(
+            '📍 위치 좌표: ${locationWeather.latitude}, ${locationWeather.longitude}',
+          );
+
+          // 취소 확인 - 날씨 조회 전
+          if (cancelCompleter.isCompleted) {
+            throw CancellationException('브리핑 요청이 취소되었습니다.');
+          }
+
+          final weatherData = await locationWeather
+              .fetchWeatherFromSavedLocation();
+
+          // 취소 확인 - 날씨 조회 후
+          if (cancelCompleter.isCompleted) {
+            throw CancellationException('브리핑 요청이 취소되었습니다.');
+          }
+
           if (weatherData != null) {
-            weatherDesc = (weatherData['weather']?[0]?['description'] ?? '').toString();
+            weatherDesc = (weatherData['weather']?[0]?['description'] ?? '')
+                .toString();
             temp = (weatherData['main']?['temp'] ?? '').toString();
           }
         } else {
           print('❌ 저장된 위치 정보 없음');
         }
       } catch (e) {
+        if (e is CancellationException) {
+          rethrow;
+        }
         print('❌ 날씨 조회 실패: $e');
+      }
+
+      // 취소 확인 - 날씨 조회 완료 후
+      if (cancelCompleter.isCompleted) {
+        throw CancellationException('브리핑 요청이 취소되었습니다.');
       }
 
       // 다가오는 일정 조회 (최대 3개)
       final upcomingEvents = await EventService().getUpcomingEvents(days: 1);
       final limitedEvents = upcomingEvents.take(3).toList();
 
+      // 취소 확인 - 일정 조회 후
+      if (cancelCompleter.isCompleted) {
+        throw CancellationException('브리핑 요청이 취소되었습니다.');
+      }
+
       // 일정 블록 생성 (장소 정보 포함)
-      final eventsBlock = limitedEvents.isEmpty 
-          ? '오늘은 특별한 일정이 없습니다.' 
-          : limitedEvents.map((event) => '🗓️ ${DateFormat('HH:mm').format(event.startTime)}-${DateFormat('HH:mm').format(event.endTime)} | 📍 ${event.location.isEmpty ? "위치 미확인" : event.location} | ${event.title}').join('\n');
+      final eventsBlock = limitedEvents.isEmpty
+          ? '오늘은 특별한 일정이 없습니다.'
+          : limitedEvents
+                .map(
+                  (event) =>
+                      '🗓️ ${DateFormat('HH:mm').format(event.startTime)}-${DateFormat('HH:mm').format(event.endTime)} | 📍 ${event.location.isEmpty ? "위치 미확인" : event.location} | ${event.title}',
+                )
+                .join('\n');
 
       // 컨텍스트 프롬프트 빌드
       final contextPrompt = _buildContextPrompt(
@@ -60,37 +176,58 @@ class BriefingService {
         temp: temp,
         eventsBlock: eventsBlock,
       );
-      
+
       // AI 요청 (ChatService 활용)
       final startTime = DateTime.now();
       try {
-        print('🤖 AI 브리핑 요청 시작... (${DateFormat('HH:mm:ss').format(startTime)})');
-        
+        print(
+          '🤖 AI 브리핑 요청 시작... (${DateFormat('HH:mm:ss').format(startTime)})',
+        );
+
+        // 취소 확인 - AI 요청 직전
+        if (cancelCompleter.isCompleted) {
+          throw CancellationException('브리핑 요청이 취소되었습니다.');
+        }
+
         final responseText = await ChatService().generateText(
           systemPrompt: '',
           message: contextPrompt,
         );
-        
+
+        // 취소 확인 - AI 응답 후
+        if (cancelCompleter.isCompleted) {
+          throw CancellationException('브리핑 요청이 취소되었습니다.');
+        }
+
         final endTime = DateTime.now();
         final duration = endTime.difference(startTime);
-        print('✅ AI 브리핑 완성! (${DateFormat('HH:mm:ss').format(endTime)}) - 소요시간: ${duration.inSeconds}초');
-        
+        print(
+          '✅ AI 브리핑 완성! (${DateFormat('HH:mm:ss').format(endTime)}) - 소요시간: ${duration.inSeconds}초',
+        );
+
         if (responseText != null && responseText.isNotEmpty) {
           return responseText;
         }
+
         print('❌ AI 응답이 비어있음');
         return '죄송합니다. 브리핑을 생성할 수 없습니다.';
       } catch (aiError) {
+        if (aiError is CancellationException) {
+          rethrow;
+        }
         final endTime = DateTime.now();
         final duration = endTime.difference(startTime);
         print('❌ AI 요청 실패: $aiError (소요시간: ${duration.inSeconds}초)');
         return '죄송합니다. AI 요청에 실패했습니다.';
       }
     } catch (e) {
+      if (e is CancellationException) {
+        rethrow;
+      }
       return '죄송합니다. $date에 대한 브리핑을 생성하는 중 오류가 발생했습니다: $e';
     }
   }
-  
+
   String _buildContextPrompt({
     required String dateStr,
     required String address,
@@ -107,15 +244,14 @@ class BriefingService {
 // 기온: $safeTemp
 // 날씨: $safeWeather
 // 일정: $eventsBlock
-
 - 출력: 총 180~220자, 각 줄 앞에 아이콘(🗓/👗/⚠️).
 - 1) 🗓 브리핑: 오늘 일정의 시간과 장소에 맞는 추천.
 - 2) 👗 스타일: 날씨·일정 맞춤 의상 1세트와 휴대품 1개.
 - 3) ⚠️ 주의·행동: 건강/이동 주의 1개 + '만약 Y면 Z한다' 형식의 일정 맞춤 행동 1개
-     + 필요 시 시간 블로킹 힌트(알람/출발 시각).
++ 필요 시 시간 블로킹 힌트(알람/출발 시각).
 - 규칙: 두괄식, 이모지 최대 3개, 과장·링크·자기언급·프롬프트 노출 금지,
-     누락 입력은 추정하지 말고 생략.
-'''.trim();
+누락 입력은 추정하지 말고 생략.
+'''
+        .trim();
   }
 }
-
