@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-// import 'package:firebase_auth/firebase_auth.dart'; // Firebase 사용하지 않음
 import 'package:provider/provider.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../services/simple_google_sign_in_service.dart';
@@ -25,12 +24,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool _isDailyNotificationEnabled = true;
   TimeOfDay _notificationTime = const TimeOfDay(hour: 9, minute: 0);
-  
+
   // AI 모드 설정
-  Set<String> _selectedAiModes = {'health'}; // 기본값: 건강만 선택
+  Set<String> _selectedAiModes = {'weather'}; // 기본값: 날씨
   final Map<String, String> _aiModes = {
+    'weather': '날씨',
+    'location': '위치',
     'health': '건강',
-    'learning': '학습', 
+    'learning': '학습',
     'style': '스타일',
     'travel': '여행',
   };
@@ -70,7 +71,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _isDarkMode = settings['isDarkMode'];
           _isDailyNotificationEnabled = settings['isDailyNotificationEnabled'];
           _notificationTime = settings['notificationTime'];
-          _selectedAiModes = Set<String>.from(settings['selectedAiModes'] ?? ['health']);
+          _selectedAiModes = Set<String>.from(
+            settings['selectedAiModes'] ?? ['weather'],
+          );
         });
       }
     } catch (e) {
@@ -82,11 +85,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       await SettingsService().setWeekStartDay(_weekStartDay);
       await SettingsService().setIsDarkMode(_isDarkMode);
-      await SettingsService().setIsDailyNotificationEnabled(_isDailyNotificationEnabled);
+      await SettingsService().setIsDailyNotificationEnabled(
+        _isDailyNotificationEnabled,
+      );
       await SettingsService().setNotificationTime(_notificationTime);
-      await SettingsService().setSelectedAiModes(_selectedAiModes.toList());
     } catch (e) {
       print('설정 저장 실패: $e');
+    }
+  }
+
+  // AI 모드만 저장하는 별도 메서드
+  Future<void> _saveAiModeSettings() async {
+    try {
+      await SettingsService().setSelectedAiModes(_selectedAiModes.toList());
+    } catch (e) {
+      print('AI 모드 설정 저장 실패: $e');
     }
   }
 
@@ -94,20 +107,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       // 안전한 로그아웃
       await SimpleGoogleSignInService().signOut();
-      
+
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const SimpleGoogleLoginScreen()),
+          MaterialPageRoute(
+            builder: (context) => const SimpleGoogleLoginScreen(),
+          ),
           (route) => false,
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('로그아웃 실패: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('로그아웃 실패: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -130,18 +142,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _notificationTime = picked;
       });
       await _saveSettings();
-      
+
       // 하루 일정 알림이 활성화되어 있으면 새로운 시간으로 재예약
       if (_isDailyNotificationEnabled) {
         await SettingsService().setNotificationTime(picked);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('알림 시간이 ${picked.format(context)}로 변경되었습니다'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
+                  if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('알림 시간이 ${picked.format(context)}로 변경되었습니다'),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
       }
     }
   }
@@ -153,6 +166,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // AI 모드별 아이콘 반환
   IconData _getAiModeIcon(String mode) {
     switch (mode) {
+      case 'weather':
+        return Icons.wb_sunny;
+      case 'location':
+        return Icons.location_on;
       case 'health':
         return Icons.favorite;
       case 'learning':
@@ -169,12 +186,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // AI 모드별 색상 반환
   Color _getAiModeColor(String mode) {
     switch (mode) {
+      case 'weather':
+        return Colors.orange;
+      case 'location':
+        return Colors.blue;
       case 'health':
         return Colors.red;
       case 'learning':
-        return Colors.blue;
+        return Colors.teal;
       case 'style':
-        return Colors.purple;
+        return Colors.pink;
       case 'travel':
         return Colors.green;
       default:
@@ -192,17 +213,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context, snapshot) {
         Map<String, String?> userInfo = {};
         GoogleSignInAccount? googleUser;
-        
+
         if (snapshot.hasData) {
           userInfo = snapshot.data!['stored'] as Map<String, String?>;
           googleUser = snapshot.data!['google'] as GoogleSignInAccount?;
         }
-        
+
         // 실제 Google 계정 정보가 있으면 우선 사용, 없으면 저장된 정보 사용
-        final displayName = googleUser?.displayName ?? userInfo['name'] ?? '사용자';
+        final displayName =
+            googleUser?.displayName ?? userInfo['name'] ?? '사용자';
         final email = googleUser?.email ?? userInfo['email'] ?? '';
         final photoUrl = googleUser?.photoUrl ?? userInfo['photo'];
-        
+
         return Container(
           margin: const EdgeInsets.all(16),
           padding: const EdgeInsets.all(20),
@@ -256,7 +278,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     if (_userProfile?.mbtiType != null) ...[
                       const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(8),
@@ -290,21 +315,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<Map<String, dynamic>> _getUserInfo() async {
     try {
       // 저장된 사용자 정보 먼저 가져오기
-      final storedUserInfo = await SimpleGoogleSignInService().getStoredUserInfo();
-      
+      final storedUserInfo = await SimpleGoogleSignInService()
+          .getStoredUserInfo();
+
       // 실제 Google 계정 정보 가져오기 (백그라운드 복원 포함)
       final googleUser = SimpleGoogleSignInService().currentUser;
-      
-      return {
-        'stored': storedUserInfo,
-        'google': googleUser,
-      };
+
+      return {'stored': storedUserInfo, 'google': googleUser};
     } catch (e) {
       print('❌ 사용자 정보 가져오기 실패: $e');
-      return {
-        'stored': <String, String?>{},
-        'google': null,
-      };
+      return {'stored': <String, String?>{}, 'google': null};
     }
   }
 
@@ -372,160 +392,214 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _buildUserSection(),
 
               // 외관 섹션
-              _buildSettingsSection(
-                '외관',
-                [
-                  _buildSettingsTile(
-                    icon: _isDarkMode ? Icons.dark_mode : Icons.light_mode,
-                    title: '다크 모드',
-                    subtitle: _isDarkMode ? '어두운 테마' : '밝은 테마',
-                    trailing: Switch(
-                      value: _isDarkMode,
-                      onChanged: (value) async {
-                        setState(() {
-                          _isDarkMode = value;
-                        });
-                        
-                        // ThemeProvider를 통해 테마 변경
-                        await context.read<ThemeProvider>().setTheme(value);
-                        await _saveSettings();
-                        
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(_isDarkMode ? '다크 모드가 활성화되었습니다' : '라이트 모드가 활성화되었습니다'),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        }
-                      },
-                    ),
-                  ),
-                ],
-              ),
+              _buildSettingsSection('외관', [
+                _buildSettingsTile(
+                  icon: _isDarkMode ? Icons.dark_mode : Icons.light_mode,
+                  title: '다크 모드',
+                  subtitle: _isDarkMode ? '어두운 테마' : '밝은 테마',
+                  trailing: Switch(
+                    value: _isDarkMode,
+                    onChanged: (value) async {
+                      setState(() {
+                        _isDarkMode = value;
+                      });
 
-                                            // AI 모드 섹션
-               _buildSettingsSection(
-                 'AI 모드',
-                 [
-                   ..._aiModes.entries.map((entry) => _buildSettingsTile(
-                     icon: _getAiModeIcon(entry.key),
-                     title: entry.value,
-                     subtitle: _selectedAiModes.contains(entry.key) 
-                         ? '${entry.value} 관련 AI 응답 활성화'
-                         : '${entry.value} 관련 AI 응답 비활성화',
-                     trailing: Switch(
-                       value: _selectedAiModes.contains(entry.key),
-                       onChanged: (value) async {
-                         setState(() {
-                           if (value == true) {
-                             _selectedAiModes.add(entry.key);
-                           } else {
-                             _selectedAiModes.remove(entry.key);
-                           }
-                         });
-                         await _saveSettings();
-                         
-                         if (mounted) {
-                           final selectedCount = _selectedAiModes.length;
-                           final message = value 
-                               ? '${entry.value} AI 모드가 활성화되었습니다'
-                               : '${entry.value} AI 모드가 비활성화되었습니다';
+                      // ThemeProvider를 통해 테마 변경
+                      await context.read<ThemeProvider>().setTheme(value);
+                      await _saveSettings();
+
+                                               if (mounted) {
                            ScaffoldMessenger.of(context).showSnackBar(
                              SnackBar(
-                               content: Text(message),
-                               backgroundColor: value ? Colors.green : Colors.orange,
+                               content: Text(
+                                 _isDarkMode
+                                     ? '다크 모드가 활성화되었습니다'
+                                     : '라이트 모드가 활성화되었습니다',
+                               ),
+                               backgroundColor: Colors.green,
+                               duration: const Duration(seconds: 2),
                              ),
                            );
                          }
-                       },
-                     ),
-                     iconColor: _selectedAiModes.contains(entry.key) 
-                         ? _getAiModeColor(entry.key) 
-                         : Colors.grey,
-                   )),
-                 ],
-               ),
+                    },
+                  ),
+                ),
+              ]),
+                             // AI 모드 섹션
+               _buildSettingsSection('AI 모드', [
+                                   // 날씨와 위치 모드를 상단에 배치
+                  ..._aiModes.entries.where((entry) => 
+                    entry.key == 'weather' || entry.key == 'location'
+                  ).map(
+                    (entry) => _buildSettingsTile(
+                      icon: _getAiModeIcon(entry.key),
+                      title: entry.value,
+                      subtitle: _selectedAiModes.contains(entry.key)
+                          ? '${entry.value} 관련 AI 응답 활성화'
+                          : '${entry.value} 관련 AI 응답 비활성화',
+                      trailing: Switch(
+                        value: _selectedAiModes.contains(entry.key),
+                        onChanged: (value) async {
+                          setState(() {
+                            if (value == true) {
+                              _selectedAiModes.add(entry.key);
+                            } else {
+                              _selectedAiModes.remove(entry.key);
+                            }
+                          });
+                          await _saveAiModeSettings();
+
+                          if (mounted) {
+                            final message = value
+                                ? '${entry.value} AI 모드가 활성화되었습니다'
+                                : '${entry.value} AI 모드가 비활성화되었습니다';
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(message),
+                                backgroundColor: value
+                                    ? Colors.green
+                                    : Colors.orange,
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                      iconColor: _selectedAiModes.contains(entry.key)
+                          ? _getAiModeColor(entry.key)
+                          : Colors.grey,
+                    ),
+                  ),
+                                    // 나머지 모드들
+                  ..._aiModes.entries.where((entry) => 
+                    entry.key != 'weather' && entry.key != 'location'
+                  ).map(
+                    (entry) => _buildSettingsTile(
+                      icon: _getAiModeIcon(entry.key),
+                      title: entry.value,
+                      subtitle: _selectedAiModes.contains(entry.key)
+                          ? '${entry.value} 관련 AI 응답 활성화'
+                          : '${entry.value} 관련 AI 응답 비활성화',
+                      trailing: Switch(
+                        value: _selectedAiModes.contains(entry.key),
+                        onChanged: (value) async {
+                          setState(() {
+                            if (value == true) {
+                              _selectedAiModes.add(entry.key);
+                            } else {
+                              _selectedAiModes.remove(entry.key);
+                            }
+                          });
+                          await _saveAiModeSettings();
+
+                          if (mounted) {
+                            final message = value
+                                ? '${entry.value} AI 모드가 활성화되었습니다'
+                                : '${entry.value} AI 모드가 비활성화되었습니다';
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(message),
+                                backgroundColor: value
+                                    ? Colors.green
+                                    : Colors.orange,
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                      iconColor: _selectedAiModes.contains(entry.key)
+                          ? _getAiModeColor(entry.key)
+                          : Colors.grey,
+                    ),
+                  ),
+               ]),
 
               // 알림 섹션
-              _buildSettingsSection(
-                '알림',
-                [
-                  _buildSettingsTile(
-                    icon: Icons.notifications,
-                    title: '하루 일정 알림',
-                    subtitle: _isDailyNotificationEnabled 
-                        ? '매일 ${_notificationTime.format(context)}에 알림'
-                        : '알림 꺼짐',
-                    trailing: Switch(
-                      value: _isDailyNotificationEnabled,
-                      onChanged: (value) async {
-                        setState(() {
-                          _isDailyNotificationEnabled = value;
-                        });
-                        await _saveSettings();
-                        
-                        // 즉시 알림 예약/취소
-                        if (value) {
-                          await SettingsService().setIsDailyNotificationEnabled(true);
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('하루 일정 알림이 활성화되었습니다'),
-                                backgroundColor: Colors.green,
-                              ),
-                            );
-                          }
-                        } else {
-                          await SettingsService().setIsDailyNotificationEnabled(false);
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('하루 일정 알림이 비활성화되었습니다'),
-                                backgroundColor: Colors.orange,
-                              ),
-                            );
-                          }
-                        }
-                      },
-                    ),
-                    iconColor: _isDailyNotificationEnabled ? Colors.orange : Colors.grey,
-                  ),
-                  if (_isDailyNotificationEnabled)
-                    _buildSettingsTile(
-                      icon: Icons.access_time,
-                      title: '알림 시간 설정',
-                      subtitle: _notificationTime.format(context),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: _selectNotificationTime,
-                    ),
-                  _buildSettingsTile(
-                    icon: Icons.preview,
-                    title: '알림 미리보기',
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () async {
-                      try {
-                        // 즉시 실제 기기 알림 발송
-                        await NativeAlarmService.scheduleNativeAlarm(
-                          title: '📅 AI 캘린더 - 오늘의 일정',
-                          body: '회의 3개, 약속 1개가 있습니다. 일정을 확인해보세요!',
-                          delaySeconds: 0, // 즉시 알림
-                          notificationId: 9999, // 미리보기 전용 ID
+              _buildSettingsSection('알림', [
+                _buildSettingsTile(
+                  icon: Icons.notifications,
+                  title: '하루 일정 알림',
+                  subtitle: _isDailyNotificationEnabled
+                      ? '매일 ${_notificationTime.format(context)}에 알림'
+                      : '알림 꺼짐',
+                  trailing: Switch(
+                    value: _isDailyNotificationEnabled,
+                    onChanged: (value) async {
+                      setState(() {
+                        _isDailyNotificationEnabled = value;
+                      });
+                      await _saveSettings();
+
+                      // 즉시 알림 예약/취소
+                      if (value) {
+                        await SettingsService().setIsDailyNotificationEnabled(
+                          true,
                         );
-                      } catch (e) {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('알림 미리보기 실패: $e'),
-                              backgroundColor: Colors.red,
+                            const SnackBar(
+                              content: Text('하루 일정 알림이 활성화되었습니다'),
+                              backgroundColor: Colors.green,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      } else {
+                        await SettingsService().setIsDailyNotificationEnabled(
+                          false,
+                        );
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('하루 일정 알림이 비활성화되었습니다'),
+                              backgroundColor: Colors.orange,
+                              duration: Duration(seconds: 2),
                             ),
                           );
                         }
                       }
                     },
                   ),
-                ],
-              ),
+                  iconColor: _isDailyNotificationEnabled
+                      ? Colors.orange
+                      : Colors.grey,
+                ),
+                if (_isDailyNotificationEnabled)
+                  _buildSettingsTile(
+                    icon: Icons.access_time,
+                    title: '알림 시간 설정',
+                    subtitle: _notificationTime.format(context),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: _selectNotificationTime,
+                  ),
+                _buildSettingsTile(
+                  icon: Icons.preview,
+                  title: '알림 미리보기',
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () async {
+                    try {
+                      // 즉시 실제 기기 알림 발송
+                      await NativeAlarmService.scheduleNativeAlarm(
+                        title: '📅 AI 캘린더 - 오늘의 일정',
+                        body: '회의 3개, 약속 1개가 있습니다. 일정을 확인해보세요!',
+                        delaySeconds: 0, // 즉시 알림
+                        notificationId: 9999, // 미리보기 전용 ID
+                      );
+                    } catch (e) {
+                                              if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('알림 미리보기 실패: $e'),
+                              backgroundColor: Colors.red,
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                    }
+                  },
+                ),
+              ]),
 
               const SizedBox(height: 20),
             ],

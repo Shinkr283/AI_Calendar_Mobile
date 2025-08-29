@@ -95,7 +95,7 @@ class ChatService {
             functionDeclarations: const [],
             conversationHistory: conversationHistory,
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 20));
       return response.text?.trim();
     } catch (_) {
       return null;

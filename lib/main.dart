@@ -111,15 +111,11 @@ void _initializeBackgroundServices() {
       print('공휴일 로드 실패: $e');
     }
 
-    try {
-      await UserService().getCurrentUser();
-      PromptService().createSystemPrompt();
-      await PromptService().initialize();
-    } catch (_) {}
-
     // 하루 일정 알림 복원
     try {
       await SettingsService().restoreDailyNotification();
+      await PromptService().initialize();
+      // await UserService().getCurrentUser();
     } catch (e) {
       print('하루 일정 알림 복원 실패: $e');
     }
