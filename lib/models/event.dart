@@ -14,6 +14,7 @@ class Event {
   final double? locationLongitude; // 🗺️ 장소 경도
   final String? googleEventId; // Google Calendar Event ID (동기화용)
   final int priority; // 우선순위 (0~5, 0이 가장 낮음, 5가 가장 높음)
+  final String labelColor; // 라벨 색깔 (hex 코드)
   final bool isCompleted;
   final bool isAllDay; // 하루 종일 이벤트 여부
   final int alarmMinutesBefore; // 알림 시간 (분 단위, 0이면 알림 없음)
@@ -31,9 +32,10 @@ class Event {
     this.locationLongitude,
     this.googleEventId,
     this.priority = 0, // 기본값 0 (가장 낮은 우선순위)
+    this.labelColor = '#FF0000', // 기본값 빨간색
     required this.isCompleted,
     this.isAllDay = false,
-    required this.alarmMinutesBefore,
+    this.alarmMinutesBefore = 10, // 기본값 10분
     required this.createdAt,
     required this.updatedAt,
   });
@@ -55,6 +57,7 @@ class Event {
       'locationLongitude': locationLongitude,
       'googleEventId': googleEventId,
       'priority': priority,
+      'labelColor': labelColor,
       'isCompleted': isCompleted ? 1 : 0,
       'isAllDay': isAllDay ? 1 : 0,
       'alarmMinutesBefore': alarmMinutesBefore,
@@ -72,10 +75,13 @@ class Event {
       startTime: DateTime.fromMillisecondsSinceEpoch(map['startTime'] as int),
       endTime: DateTime.fromMillisecondsSinceEpoch(map['endTime'] as int),
       location: map['location'] as String,
+      locationLatitude: map['locationLatitude'] as double?,
+      locationLongitude: map['locationLongitude'] as double?,
       isCompleted: (map['isCompleted'] as int) == 1,
       isAllDay: (map['isAllDay'] as int?) == 1,
       googleEventId: map['googleEventId'] as String?,
       priority: (map['priority'] as int?) ?? 0, // 기본값 0
+      labelColor: (map['labelColor'] as String?) ?? '#FF0000', // 기본값 빨간색
       alarmMinutesBefore: (map['alarmMinutesBefore'] as int?) ?? 10, // 기본값 10분
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] as int),
@@ -94,6 +100,7 @@ class Event {
     double? locationLongitude,
     String? googleEventId,
     int? priority,
+    String? labelColor,
     bool? isCompleted,
     bool? isAllDay,
     int? alarmMinutesBefore,
@@ -111,6 +118,7 @@ class Event {
       locationLongitude: locationLongitude ?? this.locationLongitude,
       googleEventId: googleEventId ?? this.googleEventId,
       priority: priority ?? this.priority,
+      labelColor: labelColor ?? this.labelColor,
       isCompleted: isCompleted ?? this.isCompleted,
       isAllDay: isAllDay ?? this.isAllDay,
       alarmMinutesBefore: alarmMinutesBefore ?? this.alarmMinutesBefore,

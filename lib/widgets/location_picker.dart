@@ -616,41 +616,6 @@ class _LocationPickerState extends State<LocationPicker> {
             ),
           ),
         
-        // 📍 우하단 내 위치 버튼 (새 일정 추가 시에만 표시)
-        if (widget.initialPlace == null)
-          Positioned(
-            right: 16,
-            bottom: _selectedPlace != null ? 140 : 80, // 카드가 있으면 위로, 없으면 아래로
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(50),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: IconButton(
-                icon: const Icon(Icons.my_location, color: Colors.blue),
-                onPressed: () async {
-                  if (_currentLocation != null && _mapController != null) {
-                    await _mapController!.animateCamera(
-                      CameraUpdate.newLatLngZoom(_currentLocation!, 15.0),
-                    );
-                  }
-                },
-                padding: const EdgeInsets.all(12),
-                constraints: const BoxConstraints(
-                  minWidth: 48,
-                  minHeight: 48,
-                ),
-              ),
-            ),
-          ),
-        
         // 🔍 커스텀 확대/축소 컨트롤 (카드와 겹치지 않도록 동적 위치 조정)
         Positioned(
           right: 16,

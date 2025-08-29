@@ -2,16 +2,17 @@ import 'package:flutter/material.dart';
 import '../models/event.dart';
 import '../services/places_service.dart';
 import 'location_picker.dart';
+import 'color_picker.dart';
 
 class EventForm extends StatefulWidget {
   final Event? initialEvent;
-  final DateTime? selectedDate; // 선택된 날짜 추가
+  final DateTime? selectedDate;
   final void Function(Event event, int alarmMinutesBefore) onSave;
 
   const EventForm({
     super.key,
     this.initialEvent,
-    this.selectedDate, // 선택된 날짜 추가
+    this.selectedDate,
     required this.onSave,
   });
 
@@ -27,10 +28,20 @@ class _EventFormState extends State<EventForm> {
   late DateTime _endTime;
   String _location = '';
   PlaceDetails? _selectedPlace;
-  int _alarmMinutesBefore = 10; // 기본값 10분 전
+  int _alarmMinutesBefore = 10;
   final List<int> _alarmOptions = [0, 5, 10, 15, 30, 60, 120];
-  int _priority = 0; // 우선순위 기본값 0
-  final List<int> _priorityOptions = [0, 1, 2, 3, 4, 5];
+  int _priority = 0;
+  String _labelColor = '#FF0000';
+  final List<Map<String, String>> _labelColorOptions = [
+    {'value': '#FF0000', 'name': '빨간색', 'color': '#FF0000'},
+    {'value': '#FF6B35', 'name': '주황색', 'color': '#FF6B35'},
+    {'value': '#FFD700', 'name': '노란색', 'color': '#FFD700'},
+    {'value': '#32CD32', 'name': '초록색', 'color': '#32CD32'},
+    {'value': '#1E90FF', 'name': '파란색', 'color': '#1E90FF'},
+    {'value': '#9370DB', 'name': '보라색', 'color': '#9370DB'},
+    {'value': '#FF69B4', 'name': '분홍색', 'color': '#FF69B4'},
+    {'value': '#8B4513', 'name': '갈색', 'color': '#8B4513'},
+  ];
 
   @override
   void initState() {
@@ -39,13 +50,10 @@ class _EventFormState extends State<EventForm> {
     _title = e?.title ?? '';
     _description = e?.description ?? '';
     
-    // 🗓️ 선택된 날짜가 있으면 해당 날짜로 시작 시간 설정
     if (e != null) {
-      // 기존 일정 수정 시에는 기존 시간 유지
       _startTime = e.startTime;
       _endTime = e.endTime;
     } else if (widget.selectedDate != null) {
-      // 새 일정 추가 시 선택된 날짜의 현재 시간으로 설정
       final now = DateTime.now();
       _startTime = DateTime(
         widget.selectedDate!.year,
@@ -56,16 +64,15 @@ class _EventFormState extends State<EventForm> {
       );
       _endTime = _startTime.add(const Duration(hours: 1));
     } else {
-      // 선택된 날짜가 없으면 현재 시간 사용
       _startTime = DateTime.now();
       _endTime = DateTime.now().add(const Duration(hours: 1));
     }
     
     _location = e?.location ?? '';
-    _alarmMinutesBefore = e?.alarmMinutesBefore ?? 10; // 기존 일정의 알림 시간 복원
-    _priority = e?.priority ?? 0; // 기존 일정의 우선순위 복원
+    _alarmMinutesBefore = e?.alarmMinutesBefore ?? 10;
+    _priority = e?.priority ?? 0;
+    _labelColor = e?.labelColor ?? '#FF0000';
 
-     // 🗺️ 저장된 좌표가 있다면 PlaceDetails 생성
     if (e?.locationLatitude != null && e?.locationLongitude != null && e!.location.isNotEmpty) {
       _selectedPlace = PlaceDetails(
         placeId: '',
@@ -75,18 +82,13 @@ class _EventFormState extends State<EventForm> {
         longitude: e.locationLongitude!,
         types: [],
       );
-      print('📍 저장된 장소 복원: ${e.location} (${e.locationLatitude}, ${e.locationLongitude})');
     } else if (e?.location != null && e!.location.isNotEmpty) {
-      // 좌표는 없지만 장소 이름이 있다면 검색해서 좌표 찾기
       _searchAndSetInitialPlace(e.location);
     }
-    print('🔧 EventForm 초기화: 알림 시간 = $_alarmMinutesBefore분 전');
   }
 
-  // 🔍 장소 이름으로 검색해서 좌표 찾기
   Future<void> _searchAndSetInitialPlace(String placeName) async {
     try {
-      print('🔍 장소 검색 시작: $placeName');
       final places = await PlacesService.searchPlaces(placeName);
       if (places.isNotEmpty) {
         final place = places.first;
@@ -95,19 +97,17 @@ class _EventFormState extends State<EventForm> {
             placeId: place.placeId,
             name: place.mainText,
             address: place.description,
-            latitude: 0, // 검색 결과에는 좌표가 없으므로 상세 정보 필요
+            latitude: 0,
             longitude: 0,
             types: [],
           );
         });
         
-        // Place Details로 정확한 좌표 가져오기
         final detailedPlace = await PlacesService.getPlaceDetails(place.placeId);
         if (detailedPlace != null && mounted) {
           setState(() {
             _selectedPlace = detailedPlace;
           });
-          print('✅ 초기 장소 설정 완료: ${detailedPlace.name} (${detailedPlace.latitude}, ${detailedPlace.longitude})');
         }
       }
     } catch (e) {
@@ -145,20 +145,11 @@ class _EventFormState extends State<EventForm> {
   }
 
   void _pickLocation() async {
-    print('🗺️ LocationPicker 호출 - 기존 장소: ${_selectedPlace?.name ?? "없음"}');
-    if (_selectedPlace != null) {
-      print('📍 기존 장소 좌표: (${_selectedPlace!.latitude}, ${_selectedPlace!.longitude})');
-    }
-    
-    // 🚨 기존 장소가 아직 설정되지 않았지만 위치 텍스트가 있는 경우 즉시 검색
     if (_selectedPlace == null && _location.isNotEmpty) {
-      print('⚠️ 기존 장소가 아직 설정되지 않음, 즉시 검색 수행: $_location');
       await _searchAndSetInitialPlace(_location);
     }
     
-    // 🚨 좌표가 0인 경우 다시 검색 (비동기 처리로 인한 타이밍 문제 해결)
     if (_selectedPlace != null && _selectedPlace!.latitude == 0 && _selectedPlace!.longitude == 0 && _location.isNotEmpty) {
-      print('⚠️ 좌표가 0인 경우 재검색 수행: $_location');
       await _searchAndSetInitialPlace(_location);
     }
     
@@ -168,7 +159,6 @@ class _EventFormState extends State<EventForm> {
           initialLocation: _location,
           initialPlace: _selectedPlace,
           onLocationSelected: (place) {
-            print('✅ LocationPicker에서 장소 선택됨: ${place.name}');
             setState(() {
               _selectedPlace = place;
               _location = place.name;
@@ -179,13 +169,51 @@ class _EventFormState extends State<EventForm> {
     );
     
     if (result != null) {
-      print('✅ LocationPicker 결과 수신: ${result.name}');
       setState(() {
         _selectedPlace = result;
         _location = result.name;
       });
-    } else {
-      print('❌ LocationPicker에서 장소 선택 취소됨');
+    }
+  }
+
+  void _showColorPicker() async {
+    final String? pickedColor = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('색상 선택'),
+          content: SingleChildScrollView(
+            child: ColorPicker(
+              labelColor: _labelColor,
+              onColorSelected: (color) {
+                setState(() {
+                  _labelColor = color;
+                });
+              },
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('취소'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('확인'),
+              onPressed: () {
+                Navigator.of(context).pop(_labelColor);
+              },
+            ),
+          ],
+        );
+      },
+    );
+
+    if (pickedColor != null) {
+      setState(() {
+        _labelColor = pickedColor;
+      });
     }
   }
 
@@ -204,10 +232,10 @@ class _EventFormState extends State<EventForm> {
         isCompleted: false,
         alarmMinutesBefore: _alarmMinutesBefore,
         priority: _priority,
+        labelColor: _labelColor,
         createdAt: widget.initialEvent?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
       );
-      print('📝 Event 생성: 알림 시간 = ${event.alarmMinutesBefore}분 전');
       widget.onSave(event, _alarmMinutesBefore);
     }
   }
@@ -264,7 +292,6 @@ class _EventFormState extends State<EventForm> {
                               fontSize: 16,
                             ),
                           ),
-                          // 세부 주소 표시 제거 - UI 크기 고정을 위해
                         ],
                       ),
                     ),
@@ -297,40 +324,118 @@ class _EventFormState extends State<EventForm> {
               ],
             ),
             const SizedBox(height: 8),
-            // 우선순위 설정
-            DropdownButtonFormField<int>(
-              value: _priority,
-              decoration: const InputDecoration(labelText: '우선순위'),
-              items: _priorityOptions
-                  .map((p) => DropdownMenuItem(
-                        value: p,
-                        child: Row(
-                          children: [
-                            if (p == 0)
-                              const SizedBox.shrink()
-                            else
-                              Row(
-                                children: List.generate(
-                                  p,
-                                  (index) => Icon(
-                                    Icons.star,
-                                    color: Colors.amber,
-                                    size: 20,
-                                  ),
-                                ),
-                              ),
-                            if (p != 0) const SizedBox(width: 8),
-                            Text(
-                              p == 0 ? '보통' : '',
-                              style: TextStyle(
-                                color: p == 0 ? Colors.grey : Colors.black,
-                              ),
-                            ),
-                          ],
+            // 우선순위 설정 (별 아이콘으로 선택)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '우선순위',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: List.generate(5, (index) {
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _priority = index + 1;
+                        });
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        child: Icon(
+                          Icons.star,
+                          color: index < _priority ? Colors.amber : Colors.grey.shade300,
+                          size: 30,
                         ),
-                      ))
-                  .toList(),
-              onChanged: (v) => setState(() => _priority = v ?? 0),
+                      ),
+                    );
+                  }),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // 라벨 색상 설정
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '라벨 색상',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      ..._labelColorOptions.map((color) {
+                        final isSelected = _labelColor == color['value'];
+                        final colorValue = color['value']!;
+                        final colorInt = int.parse(colorValue.substring(1), radix: 16);
+                        print('색상 옵션: $colorValue -> $colorInt'); // 디버깅용
+                        
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _labelColor = colorValue;
+                            });
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 12),
+                            child: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: Color(0xFF000000 + colorInt), // 알파값을 앞에 추가
+                                borderRadius: BorderRadius.circular(20),
+                                border: isSelected ? Border.all(color: Colors.blue, width: 3) : Border.all(color: Colors.grey.shade300, width: 1),
+                              ),
+                              child: isSelected 
+                                ? const Icon(
+                                    Icons.check,
+                                    color: Colors.white,
+                                    size: 20,
+                                  )
+                                : null,
+                            ),
+                          ),
+                        );
+                      }),
+                      // RGB 직접 색상 커스터마이징
+                      GestureDetector(
+                        onTap: () => _showColorPicker(),
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 12),
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Colors.red, Colors.orange, Colors.yellow, Colors.green, Colors.blue, Colors.indigo, Colors.purple],
+                              ),
+                              borderRadius: BorderRadius.circular(20),
+                              border: _labelColor.startsWith('#') && !_labelColorOptions.any((c) => c['value'] == _labelColor) 
+                                ? Border.all(color: Colors.blue, width: 3) 
+                                : null,
+                            ),
+                            child: const Icon(
+                              Icons.color_lens,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             // 알림 시간 설정

@@ -93,6 +93,7 @@ class DatabaseService {
           locationLatitude REAL,
           locationLongitude REAL,
           priority INTEGER NOT NULL DEFAULT 0,
+          labelColor TEXT NOT NULL DEFAULT '#FF0000',
           googleEventId TEXT UNIQUE,
           isCompleted INTEGER NOT NULL DEFAULT 0,
           isAllDay INTEGER NOT NULL DEFAULT 0,
@@ -154,6 +155,12 @@ class DatabaseService {
       print('📍 스택 트레이스: $stackTrace');
       rethrow;
     }
+  }
+
+  // 기존 일정들의 labelColor를 기본값으로 업데이트
+  Future<void> updateExistingEventsLabelColor() async {
+    final db = await database;
+    await db.execute('UPDATE events SET labelColor = "#FF0000" WHERE labelColor IS NULL OR labelColor = ""');
   }
 
   // 데이터베이스 닫기

@@ -22,6 +22,7 @@ class EventService {
     String? location,
     bool isAllDay = false,
     int priority = 0,
+    String labelColor = '#FF0000', // 라벨 색상 추가
   }) async {
     final event = Event(
       id: _generateEventId(),
@@ -31,6 +32,7 @@ class EventService {
       endTime: endTime,
       location: location ?? '',
       priority: priority,
+      labelColor: labelColor, // 라벨 색상 추가
       isCompleted: false,
       isAllDay: isAllDay,
       alarmMinutesBefore: alarmMinutesBefore,

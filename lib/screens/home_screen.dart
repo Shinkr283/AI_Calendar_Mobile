@@ -484,13 +484,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       padding: const EdgeInsets.all(12),
                       child: Row(
                         children: [
-                          // 파란색 점 (이전 디자인)
+                          // 라벨 색깔 막대 (두 번째 이미지처럼)
                           Container(
-                            width: 8,
-                            height: 8,
+                            width: 4,
+                            height: 60,
                             decoration: BoxDecoration(
-                              color: isPast ? Colors.grey.shade400 : Colors.blue,
-                              borderRadius: BorderRadius.circular(4),
+                              color: isPast ? Colors.grey.shade400 : Color(int.parse((event.labelColor.isNotEmpty ? event.labelColor : '#FF0000').substring(1), radix: 16) + 0xFF000000), // 라벨 색상 적용 (기본값 설정)
+                              borderRadius: BorderRadius.circular(2),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -508,12 +508,56 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                Text(
-                                  '${DateFormat('HH:mm').format(event.startTime)} - ${DateFormat('HH:mm').format(event.endTime)}',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: isPast ? Colors.grey.shade400 : Colors.grey.shade600,
+                                // 장소 정보 표시 (위로 이동)
+                                if (event.location.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.place,
+                                        size: 14,
+                                        color: isPast ? Colors.grey.shade400 : Colors.grey.shade500,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          event.location,
+                                          style: TextStyle(
+                                            color: isPast ? Colors.grey.shade400 : Colors.grey.shade600,
+                                            fontSize: 12,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
                                   ),
+                                ],
+                                // 시간 정보와 별 아이콘 표시 (아래로 이동)
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        '${event.startTime.hour.toString().padLeft(2, '0')}:${event.startTime.minute.toString().padLeft(2, '0')} - ${event.endTime.hour.toString().padLeft(2, '0')}:${event.endTime.minute.toString().padLeft(2, '0')}',
+                                        style: TextStyle(
+                                          color: isPast ? Colors.grey.shade400 : Colors.grey.shade600,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                    // 별 아이콘 (우선순위)
+                                    if (event.priority > 0)
+                                      Row(
+                                        children: List.generate(
+                                          event.priority,
+                                          (index) => Icon(
+                                            Icons.star,
+                                            color: isPast ? Colors.grey.shade400 : Colors.amber,
+                                            size: 16,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ],
                             ),

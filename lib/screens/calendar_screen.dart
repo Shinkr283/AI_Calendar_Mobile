@@ -111,6 +111,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           location: newEvent.location,
           alarmMinutesBefore: newEvent.alarmMinutesBefore, // 알림 시간 전달
           priority: newEvent.priority, // 우선순위 전달
+          labelColor: newEvent.labelColor, // 라벨 색상 추가
         );
 
         print('✅ 일정 추가 성공: ${createdEvent.id}');
@@ -280,8 +281,23 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
-  String _fmtDate(DateTime d) =>
-      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+     String _fmtDate(DateTime d) =>
+       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+   /// 일정의 라벨 색상을 안전하게 파싱하는 헬퍼 함수
+   Color _getEventColor(Event event) {
+     try {
+       final colorString = event.labelColor.isNotEmpty ? event.labelColor : '#FF0000';
+       if (colorString.startsWith('#') && colorString.length == 7) {
+         return Color(int.parse(colorString.substring(1), radix: 16) + 0xFF000000);
+       } else {
+         return Colors.red; // 기본값
+       }
+     } catch (e) {
+       print('색상 파싱 오류: ${event.labelColor} -> 기본값 사용');
+       return Colors.red;
+     }
+   }
 
   @override
   Widget build(BuildContext context) {
@@ -522,61 +538,96 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
                         if (todayEvents.isEmpty) return const SizedBox.shrink();
 
-                        return Stack(
-                          children: todayEvents.take(3).map((event) {
-                            final idx = eventLineMap[event.id] ?? 0;
-                            final isStart = isSameDay(event.startTime, day);
-                            final isEnd = isSameDay(event.endTime, day);
-                            final isSingle = isStart && isEnd;
-
-                            // 🎨 첫 번째 이미지처럼 연속된 막대 디자인
-                            return Positioned(
-                              left: isSingle ? 4 : (isStart ? 4 : 0),
-                              right: isSingle ? 4 : (isEnd ? 4 : 0),
-                              top: 24.0 + idx * 14.0, // 더 촘촘하게 배치
-                              height: 12, // 더 얇게
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF4FC3F7), // 하늘색 계열
-                                  borderRadius: isSingle
-                                      ? BorderRadius.circular(6)
-                                      : isStart
-                                      ? const BorderRadius.horizontal(
-                                          left: Radius.circular(6),
-                                        )
-                                      : isEnd
-                                      ? const BorderRadius.horizontal(
-                                          right: Radius.circular(6),
-                                        )
-                                      : BorderRadius.zero,
-                                ),
-                                child:
-                                    isStart // 시작일에만 제목 표시
-                                    ? Align(
-                                        alignment: Alignment.centerLeft,
-                                        child: Padding(
-                                          padding: const EdgeInsets.only(
-                                            left: 4.0,
-                                          ),
-                                          child: Text(
-                                            event.title.length > 7
-                                                ? '${event.title.substring(0, 7)}…'
-                                                : event.title,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      )
-                                    : const SizedBox.shrink(), // 중간일과 끝일에는 빈 공간
-                              ),
-                            );
-                          }).toList(),
-                        );
+                                                 // 최대 2개 일정만 표시하고, 나머지는 "+N"으로 표시
+                         final displayEvents = todayEvents.take(2).toList();
+                         final remainingCount = todayEvents.length - displayEvents.length;
+                         
+                         return Stack(
+                           children: [
+                             // 첫 번째 일정
+                             if (displayEvents.isNotEmpty)
+                               Positioned(
+                                 left: 4,
+                                 top: 24.0,
+                                 child: Row(
+                                   mainAxisSize: MainAxisSize.min,
+                                   children: [
+                                     // 라벨 색깔 점
+                                     Container(
+                                       width: 6,
+                                       height: 6,
+                                       decoration: BoxDecoration(
+                                         color: _getEventColor(displayEvents[0]),
+                                         shape: BoxShape.circle,
+                                       ),
+                                     ),
+                                     const SizedBox(width: 6),
+                                     // 제목 텍스트
+                                     Flexible(
+                                       child: Text(
+                                         displayEvents[0].title,
+                                         style: const TextStyle(
+                                           color: Colors.black,
+                                           fontSize: 10,
+                                           fontWeight: FontWeight.normal,
+                                         ),
+                                         maxLines: 1,
+                                         overflow: TextOverflow.ellipsis,
+                                       ),
+                                     ),
+                                   ],
+                                 ),
+                               ),
+                                                           // 두 번째 일정
+                              if (displayEvents.length > 1)
+                                Positioned(
+                                  left: 4,
+                                  top: 35.0, // 첫 번째 일정과 적당한 간격으로 조정
+                                  child: Row(
+                                   mainAxisSize: MainAxisSize.min,
+                                   children: [
+                                     // 라벨 색깔 점
+                                     Container(
+                                       width: 6,
+                                       height: 6,
+                                       decoration: BoxDecoration(
+                                         color: _getEventColor(displayEvents[1]),
+                                         shape: BoxShape.circle,
+                                       ),
+                                     ),
+                                     const SizedBox(width: 6),
+                                     // 제목 텍스트
+                                     Flexible(
+                                       child: Text(
+                                         displayEvents[1].title,
+                                         style: const TextStyle(
+                                           color: Colors.black,
+                                           fontSize: 10,
+                                           fontWeight: FontWeight.normal,
+                                         ),
+                                         maxLines: 1,
+                                         overflow: TextOverflow.ellipsis,
+                                       ),
+                                     ),
+                                   ],
+                                 ),
+                               ),
+                                                           // 추가 일정이 있으면 "+N" 표시
+                              if (remainingCount > 0)
+                                Positioned(
+                                  left: 4,
+                                  top: 46.0, // 두 번째 일정 아래 (간격 조정)
+                                  child: Text(
+                                   '+$remainingCount',
+                                   style: const TextStyle(
+                                     color: Colors.grey,
+                                     fontSize: 9,
+                                     fontWeight: FontWeight.bold,
+                                   ),
+                                 ),
+                               ),
+                           ],
+                         );
                       },
                     ),
                   ),
@@ -590,13 +641,34 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             itemCount: _getSelectedDayEvents().length,
                             itemBuilder: (context, index) {
                               final event = _getSelectedDayEvents()[index];
+                              
+                              // 라벨 색상 안전하게 파싱
+                              Color titleColor;
+                              try {
+                                final colorString = event.labelColor.isNotEmpty ? event.labelColor : '#FF0000';
+                                if (colorString.startsWith('#') && colorString.length == 7) {
+                                  titleColor = Color(int.parse(colorString.substring(1), radix: 16) + 0xFF000000);
+                                } else {
+                                  titleColor = Colors.red; // 기본값
+                                }
+                              } catch (e) {
+                                print('일정 목록 색상 파싱 오류: ${event.labelColor} -> 기본값 사용');
+                                titleColor = Colors.red;
+                              }
+
                               return Card(
                                 margin: const EdgeInsets.symmetric(
                                   horizontal: 16,
                                   vertical: 4,
                                 ),
                                 child: ListTile(
-                                  title: Text(event.title),
+                                  title: Text(
+                                    event.title,
+                                    style: const TextStyle(
+                                      color: Colors.black, // 검정색으로 고정
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
                                   subtitle: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
@@ -731,135 +803,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
-  // Future<DateTime?> _showSyncMonthSelectionDialog() async {
-  //   final currentDate = DateTime.now();
-
-  //   // 1단계: 년도 선택
-  //   final selectedYear = await _showYearSelectionDialog(currentDate.year);
-  //   if (selectedYear == null) return null;
-
-  //   // 2단계: 월 선택
-  //   final selectedMonth = await _showMonthSelectionDialog(selectedYear);
-  //   if (selectedMonth == null) return null;
-
-  //   // 3단계: 선택 확인
-  //   final confirmed = await _showConfirmationDialog(selectedYear, selectedMonth);
-  //   if (confirmed != true) return null;
-
-  //   return DateTime(selectedYear, selectedMonth, 1);
-  // }
-
-  // Future<int?> _showYearSelectionDialog(int currentYear) async {
-  //   return await showDialog<int>(
-  //     context: context,
-  //     builder: (context) => AlertDialog(
-  //       title: const Text('동기화할 날짜를 선택하세요'),
-  //       content: SizedBox(
-  //         width: double.maxFinite,
-  //         height: 300,
-  //         child: GridView.builder(
-  //           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-  //             crossAxisCount: 3,
-  //             childAspectRatio: 2.5,
-  //             crossAxisSpacing: 8,
-  //             mainAxisSpacing: 8,
-  //           ),
-  //           itemCount: 11, // 2020년부터 2030년까지
-  //           itemBuilder: (context, index) {
-  //             final year = 2020 + index;
-  //             final isSelected = year == currentYear;
-
-  //             return InkWell(
-  //               onTap: () => Navigator.of(context).pop(year),
-  //               child: Container(
-  //                 decoration: BoxDecoration(
-  //                   color: isSelected ? Colors.blue : Colors.grey.shade200,
-  //                   borderRadius: BorderRadius.circular(8),
-  //                   border: Border.all(
-  //                     color: isSelected ? Colors.blue : Colors.grey.shade300,
-  //                   ),
-  //                 ),
-  //                 child: Center(
-  //                   child: Text(
-  //                     year.toString(),
-  //                     style: TextStyle(
-  //                       fontSize: 16,
-  //                       fontWeight: FontWeight.bold,
-  //                       color: isSelected ? Colors.white : Colors.black,
-  //                     ),
-  //                   ),
-  //                 ),
-  //               ),
-  //             );
-  //           },
-  //         ),
-  //       ),
-  //       actions: [
-  //         TextButton(
-  //           onPressed: () => Navigator.of(context).pop(),
-  //           child: const Text('취소'),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
-
-  // Future<int?> _showMonthSelectionDialog(int selectedYear) async {
-  //   return await showDialog<int>(
-  //     context: context,
-  //     builder: (context) => AlertDialog(
-  //       title: Text('$selectedYear년 동기화할 날짜를 선택하세요'),
-  //       content: SizedBox(
-  //         width: double.maxFinite,
-  //         height: 200,
-  //         child: GridView.builder(
-  //           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-  //             crossAxisCount: 3,
-  //             childAspectRatio: 2.5,
-  //             crossAxisSpacing: 8,
-  //             mainAxisSpacing: 8,
-  //           ),
-  //           itemCount: 12,
-  //           itemBuilder: (context, index) {
-  //             final month = index + 1;
-  //             final monthNames = [
-  //               '1월', '2월', '3월', '4월', '5월', '6월',
-  //               '7월', '8월', '9월', '10월', '11월', '12월'
-  //             ];
-
-  //             return InkWell(
-  //               onTap: () => Navigator.of(context).pop(month),
-  //               child: Container(
-  //                 decoration: BoxDecoration(
-  //                   color: Colors.grey.shade200,
-  //                   borderRadius: BorderRadius.circular(8),
-  //                   border: Border.all(color: Colors.grey.shade300),
-  //                 ),
-  //                 child: Center(
-  //                   child: Text(
-  //                     monthNames[index],
-  //                     style: const TextStyle(
-  //                       fontSize: 16,
-  //                       fontWeight: FontWeight.bold,
-  //                     ),
-  //                   ),
-  //                 ),
-  //               ),
-  //             );
-  //           },
-  //         ),
-  //       ),
-  //       actions: [
-  //         TextButton(
-  //           onPressed: () => Navigator.of(context).pop(),
-  //           child: const Text('취소'),
-  //         ),
-  //                ],
-  //      ),
-  //    );
-  //  }
-
-  Future<void> _showWeekStartDayDialog() async {
+    Future<void> _showWeekStartDayDialog() async {
     final settingsService = SettingsService();
     final currentWeekStartDay = await settingsService.getWeekStartDay();
 

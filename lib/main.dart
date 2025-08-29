@@ -95,6 +95,15 @@ void _initializeBackgroundServices() {
     // 알림 권한 요청
     await _requestNotificationPermission();
     
+    // 기존 일정들의 labelColor 업데이트
+    try {
+      final databaseService = DatabaseService();
+      await databaseService.updateExistingEventsLabelColor();
+      print('✅ 기존 일정들의 labelColor 업데이트 완료');
+    } catch (e) {
+      print('❌ labelColor 업데이트 실패: $e');
+    }
+    
     // 위치 서비스 초기화
     try {
       final locationWeatherService = LocationWeatherService();
@@ -110,16 +119,12 @@ void _initializeBackgroundServices() {
     } catch (e) {
       print('공휴일 로드 실패: $e');
     }
-
-    try {
-      await UserService().getCurrentUser();
-      PromptService().createSystemPrompt();
-      await PromptService().initialize();
-    } catch (_) {}
-
+    
     // 하루 일정 알림 복원
     try {
       await SettingsService().restoreDailyNotification();
+      await PromptService().initialize();
+      // await UserService().getCurrentUser();
     } catch (e) {
       print('하루 일정 알림 복원 실패: $e');
     }
