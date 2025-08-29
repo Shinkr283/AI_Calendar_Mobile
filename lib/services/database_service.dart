@@ -92,6 +92,7 @@ class DatabaseService {
           location TEXT,
           locationLatitude REAL,
           locationLongitude REAL,
+          priority INTEGER NOT NULL DEFAULT 0,
           googleEventId TEXT UNIQUE,
           isCompleted INTEGER NOT NULL DEFAULT 0,
           isAllDay INTEGER NOT NULL DEFAULT 0,

@@ -21,6 +21,7 @@ class EventService {
     required int alarmMinutesBefore,
     String? location,
     bool isAllDay = false,
+    int priority = 0,
   }) async {
     final event = Event(
       id: _generateEventId(),
@@ -29,6 +30,7 @@ class EventService {
       startTime: startTime,
       endTime: endTime,
       location: location ?? '',
+      priority: priority,
       isCompleted: false,
       isAllDay: isAllDay,
       alarmMinutesBefore: alarmMinutesBefore,

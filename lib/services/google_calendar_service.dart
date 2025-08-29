@@ -61,6 +61,13 @@ class GoogleCalendarService {
 
     ev.start = _toEventDateTime(e.startTime);
     ev.end = _toEventDateTime(e.endTime);
+    
+    // 우선순위를 extendedProperties의 private 필드에 저장
+    ev.extendedProperties = calendar.EventExtendedProperties()
+      ..private = {
+        'priority': e.priority.toString(),
+      };
+    
     return ev;
   }
 

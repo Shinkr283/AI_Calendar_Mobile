@@ -65,7 +65,7 @@ class CalendarSyncService {
         timeZone: 'Asia/Seoul',
         showDeleted: true,
         updatedMin: updatedMin,
-        fields: 'items(id,status,summary,description,location,updated,start,end),nextPageToken'
+        fields: 'items(id,status,summary,description,location,updated,start,end,extendedProperties),nextPageToken'
       );
     } catch (e) {
       // 401 대응: 재인증 후 1회 재시도
@@ -79,7 +79,7 @@ class CalendarSyncService {
         orderBy: 'startTime',
         timeZone: 'Asia/Seoul',
         showDeleted: true,
-        fields: 'items(id,status,summary,description,location,updated,start,end),nextPageToken'
+        fields: 'items(id,status,summary,description,location,updated,start,end,extendedProperties),nextPageToken'
       );
     }
 
@@ -150,6 +150,7 @@ class CalendarSyncService {
               endTime: endTime,
               location: ev.location ?? local.location,
               updatedAt: googleUpdated,
+              // 우선순위는 로컬 값 유지 (변경하지 않음)
             );
             await EventService().updateEvent(updatedLocal);
           } else if (!readonly) {
@@ -183,6 +184,7 @@ class CalendarSyncService {
           location: ev.location ?? '',
           alarmMinutesBefore: 10,
           isAllDay: ev.start?.dateTime == null && ev.start?.date != null,
+          priority: 0, // 새로 생성되는 이벤트는 우선순위 0으로 고정
         );
         final bound = createdLocal.copyWith(
           googleEventId: gId,

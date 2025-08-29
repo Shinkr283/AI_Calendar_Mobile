@@ -13,6 +13,7 @@ class Event {
   final double? locationLatitude; // 🗺️ 장소 위도
   final double? locationLongitude; // 🗺️ 장소 경도
   final String? googleEventId; // Google Calendar Event ID (동기화용)
+  final int priority; // 우선순위 (0~5, 0이 가장 낮음, 5가 가장 높음)
   final bool isCompleted;
   final bool isAllDay; // 하루 종일 이벤트 여부
   final int alarmMinutesBefore; // 알림 시간 (분 단위, 0이면 알림 없음)
@@ -29,6 +30,7 @@ class Event {
     this.locationLatitude,
     this.locationLongitude,
     this.googleEventId,
+    this.priority = 0, // 기본값 0 (가장 낮은 우선순위)
     required this.isCompleted,
     this.isAllDay = false,
     required this.alarmMinutesBefore,
@@ -52,6 +54,7 @@ class Event {
       'locationLatitude': locationLatitude,
       'locationLongitude': locationLongitude,
       'googleEventId': googleEventId,
+      'priority': priority,
       'isCompleted': isCompleted ? 1 : 0,
       'isAllDay': isAllDay ? 1 : 0,
       'alarmMinutesBefore': alarmMinutesBefore,
@@ -72,6 +75,7 @@ class Event {
       isCompleted: (map['isCompleted'] as int) == 1,
       isAllDay: (map['isAllDay'] as int?) == 1,
       googleEventId: map['googleEventId'] as String?,
+      priority: (map['priority'] as int?) ?? 0, // 기본값 0
       alarmMinutesBefore: (map['alarmMinutesBefore'] as int?) ?? 10, // 기본값 10분
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] as int),
@@ -89,6 +93,7 @@ class Event {
     double? locationLatitude,
     double? locationLongitude,
     String? googleEventId,
+    int? priority,
     bool? isCompleted,
     bool? isAllDay,
     int? alarmMinutesBefore,
@@ -105,6 +110,7 @@ class Event {
       locationLatitude: locationLatitude ?? this.locationLatitude,
       locationLongitude: locationLongitude ?? this.locationLongitude,
       googleEventId: googleEventId ?? this.googleEventId,
+      priority: priority ?? this.priority,
       isCompleted: isCompleted ?? this.isCompleted,
       isAllDay: isAllDay ?? this.isAllDay,
       alarmMinutesBefore: alarmMinutesBefore ?? this.alarmMinutesBefore,
