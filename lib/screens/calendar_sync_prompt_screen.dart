@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../services/google_calendar_service.dart';
-import '../services/event_service.dart';
+import '../services/calendar_sync_service.dart';
 import '../main.dart';
 
 class CalendarSyncPromptScreen extends StatelessWidget {
@@ -18,45 +15,14 @@ class CalendarSyncPromptScreen extends StatelessWidget {
   Future<void> _onSync(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
+    
     try {
-      // 1. 구글 로그인 계정 accessToken 획득
-      final googleUser = await GoogleSignIn().signIn();
-      final googleAuth = await googleUser?.authentication;
-      final accessToken = googleAuth?.accessToken;
-
-      if (accessToken == null) {
-        messenger.showSnackBar(
-          const SnackBar(content: Text('구글 인증에 실패했습니다.')),
-        );
-        return;
-      }
-
-      // 2. 구글 캘린더 일정 불러오기
-      final service = GoogleCalendarService(accessToken);
-      final gEvents = await service.fetchEvents();
-
-      // 3. 구글 Event -> 앱 Event 변환 및 DB 저장
-      int successCount = 0;
-      for (final gEvent in gEvents) {
-        if (gEvent.start?.dateTime == null || gEvent.end?.dateTime == null) continue;
-        await EventService().createEvent(
-          title: gEvent.summary ?? '제목 없음',
-          description: gEvent.description ?? '',
-          startTime: gEvent.start!.dateTime!.toLocal(),
-          endTime: gEvent.end!.dateTime!.toLocal(),
-          location: gEvent.location ?? '',
-          alarmMinutesBefore: 10,
-        );
-        successCount++;
-      }
-
-      messenger.showSnackBar(
-        SnackBar(content: Text('구글 캘린더에서 $successCount개의 일정을 동기화했습니다.')),
-      );
+      // CalendarSyncService를 사용하여 동기화 실행
+      final result = await CalendarSyncService().syncAll(readonly: false);
       
-      // 동기화 완료 플래그 설정
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('hasSeenSyncPrompt', true);
+      messenger.showSnackBar(
+        SnackBar(content: Text('구글 캘린더에서 $result개의 일정을 동기화했습니다.')),
+      );
       
       if (onSyncComplete != null) onSyncComplete!();
       navigator.pushReplacement(
@@ -70,10 +36,6 @@ class CalendarSyncPromptScreen extends StatelessWidget {
   }
 
   void _onSkip(BuildContext context) async {
-    // 건너뛰기 플래그 설정
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('hasSeenSyncPrompt', true);
-    
     if (onSkip != null) onSkip!();
     Navigator.pushReplacement(
       context,

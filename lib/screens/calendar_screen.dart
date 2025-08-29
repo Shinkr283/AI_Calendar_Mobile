@@ -291,35 +291,35 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   PopupMenuButton<String>(
-                    onSelected: (value) async {
-                      if (value == 'sync_google_calendar') {
-                        _onSyncWithGoogle();
-                      } else if (value == 'week_start_day') {
-                        _showWeekStartDayDialog();
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'sync_google_calendar',
-                        child: Row(
-                          children: [
-                            Icon(Icons.sync),
-                            SizedBox(width: 8),
-                            Text('구글 캘린더 일정 동기화'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'week_start_day',
-                        child: Row(
-                          children: [
-                            Icon(Icons.calendar_view_week),
-                            SizedBox(width: 8),
-                            Text('주 시작 요일'),
-                          ],
-                        ),
-                      ),
-                    ],
+                                         onSelected: (value) async {
+                       if (value == 'sync_google_calendar') {
+                         _onSyncWithGoogle();
+                       } else if (value == 'week_start_day') {
+                         _showWeekStartDayDialog();
+                       }
+                     },
+                                         itemBuilder: (context) => [
+                       const PopupMenuItem(
+                         value: 'sync_google_calendar',
+                         child: Row(
+                           children: [
+                             Icon(Icons.sync),
+                             SizedBox(width: 8),
+                             Text('구글 캘린더 동기화'),
+                           ],
+                         ),
+                       ),
+                       const PopupMenuItem(
+                         value: 'week_start_day',
+                         child: Row(
+                           children: [
+                             Icon(Icons.calendar_view_week),
+                             SizedBox(width: 8),
+                             Text('주 시작 요일'),
+                           ],
+                         ),
+                       ),
+                     ],
                   ),
                 ],
               ),
@@ -608,16 +608,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Future<void> _onSyncWithGoogle() async {
-    // 월 선택 다이얼로그 표시
-    final selectedMonth = await _showSyncMonthSelectionDialog();
-    if (selectedMonth == null) return; // 사용자가 취소한 경우
-    
     setState(() => _isLoading = true);
     try {
-      final inserted = await CalendarSyncService().syncSpecificMonth(selectedMonth, readonly: false);
+      // 전체 동기화 실행 (3개월 전후)
+      final result = await CalendarSyncService().syncAll(readonly: false);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${selectedMonth.year}년 ${selectedMonth.month}월 동기화 완료: ${inserted}건')),
+        SnackBar(content: Text('동기화 완료: ${result}건 처리됨')),
       );
       await _loadEventsForMonth(_focusedDay);
     } catch (e) {
@@ -629,159 +626,138 @@ class _CalendarScreenState extends State<CalendarScreen> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
+
   
-  Future<DateTime?> _showSyncMonthSelectionDialog() async {
-    final currentDate = DateTime.now();
+  // Future<DateTime?> _showSyncMonthSelectionDialog() async {
+  //   final currentDate = DateTime.now();
     
-    // 1단계: 년도 선택
-    final selectedYear = await _showYearSelectionDialog(currentDate.year);
-    if (selectedYear == null) return null;
+  //   // 1단계: 년도 선택
+  //   final selectedYear = await _showYearSelectionDialog(currentDate.year);
+  //   if (selectedYear == null) return null;
     
-    // 2단계: 월 선택
-    final selectedMonth = await _showMonthSelectionDialog(selectedYear);
-    if (selectedMonth == null) return null;
+  //   // 2단계: 월 선택
+  //   final selectedMonth = await _showMonthSelectionDialog(selectedYear);
+  //   if (selectedMonth == null) return null;
     
-    // 3단계: 선택 확인
-    final confirmed = await _showConfirmationDialog(selectedYear, selectedMonth);
-    if (confirmed != true) return null;
+  //   // 3단계: 선택 확인
+  //   final confirmed = await _showConfirmationDialog(selectedYear, selectedMonth);
+  //   if (confirmed != true) return null;
     
-    return DateTime(selectedYear, selectedMonth, 1);
-  }
+  //   return DateTime(selectedYear, selectedMonth, 1);
+  // }
   
-  Future<int?> _showYearSelectionDialog(int currentYear) async {
-    return await showDialog<int>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('동기화할 날짜를 선택하세요'),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 300,
-          child: GridView.builder(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              childAspectRatio: 2.5,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-            ),
-            itemCount: 11, // 2020년부터 2030년까지
-            itemBuilder: (context, index) {
-              final year = 2020 + index;
-              final isSelected = year == currentYear;
+  // Future<int?> _showYearSelectionDialog(int currentYear) async {
+  //   return await showDialog<int>(
+  //     context: context,
+  //     builder: (context) => AlertDialog(
+  //       title: const Text('동기화할 날짜를 선택하세요'),
+  //       content: SizedBox(
+  //         width: double.maxFinite,
+  //         height: 300,
+  //         child: GridView.builder(
+  //           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+  //             crossAxisCount: 3,
+  //             childAspectRatio: 2.5,
+  //             crossAxisSpacing: 8,
+  //             mainAxisSpacing: 8,
+  //           ),
+  //           itemCount: 11, // 2020년부터 2030년까지
+  //           itemBuilder: (context, index) {
+  //             final year = 2020 + index;
+  //             final isSelected = year == currentYear;
               
-              return InkWell(
-                onTap: () => Navigator.of(context).pop(year),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isSelected ? Colors.blue : Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isSelected ? Colors.blue : Colors.grey.shade300,
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      year.toString(),
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: isSelected ? Colors.white : Colors.black,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('취소'),
-          ),
-        ],
-      ),
-    );
-  }
+  //             return InkWell(
+  //               onTap: () => Navigator.of(context).pop(year),
+  //               child: Container(
+  //                 decoration: BoxDecoration(
+  //                   color: isSelected ? Colors.blue : Colors.grey.shade200,
+  //                   borderRadius: BorderRadius.circular(8),
+  //                   border: Border.all(
+  //                     color: isSelected ? Colors.blue : Colors.grey.shade300,
+  //                   ),
+  //                 ),
+  //                 child: Center(
+  //                   child: Text(
+  //                     year.toString(),
+  //                     style: TextStyle(
+  //                       fontSize: 16,
+  //                       fontWeight: FontWeight.bold,
+  //                       color: isSelected ? Colors.white : Colors.black,
+  //                     ),
+  //                   ),
+  //                 ),
+  //               ),
+  //             );
+  //           },
+  //         ),
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.of(context).pop(),
+  //           child: const Text('취소'),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
   
-  Future<int?> _showMonthSelectionDialog(int selectedYear) async {
-    return await showDialog<int>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('$selectedYear년 동기화할 날짜를 선택하세요'),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 200,
-          child: GridView.builder(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              childAspectRatio: 2.5,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-            ),
-            itemCount: 12,
-            itemBuilder: (context, index) {
-              final month = index + 1;
-              final monthNames = [
-                '1월', '2월', '3월', '4월', '5월', '6월',
-                '7월', '8월', '9월', '10월', '11월', '12월'
-              ];
+  // Future<int?> _showMonthSelectionDialog(int selectedYear) async {
+  //   return await showDialog<int>(
+  //     context: context,
+  //     builder: (context) => AlertDialog(
+  //       title: Text('$selectedYear년 동기화할 날짜를 선택하세요'),
+  //       content: SizedBox(
+  //         width: double.maxFinite,
+  //         height: 200,
+  //         child: GridView.builder(
+  //           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+  //             crossAxisCount: 3,
+  //             childAspectRatio: 2.5,
+  //             crossAxisSpacing: 8,
+  //             mainAxisSpacing: 8,
+  //           ),
+  //           itemCount: 12,
+  //           itemBuilder: (context, index) {
+  //             final month = index + 1;
+  //             final monthNames = [
+  //               '1월', '2월', '3월', '4월', '5월', '6월',
+  //               '7월', '8월', '9월', '10월', '11월', '12월'
+  //             ];
               
-              return InkWell(
-                onTap: () => Navigator.of(context).pop(month),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: Center(
-                    child: Text(
-                      monthNames[index],
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('취소'),
-          ),
-                 ],
-       ),
-     );
-   }
+  //             return InkWell(
+  //               onTap: () => Navigator.of(context).pop(month),
+  //               child: Container(
+  //                 decoration: BoxDecoration(
+  //                   color: Colors.grey.shade200,
+  //                   borderRadius: BorderRadius.circular(8),
+  //                   border: Border.all(color: Colors.grey.shade300),
+  //                 ),
+  //                 child: Center(
+  //                   child: Text(
+  //                     monthNames[index],
+  //                     style: const TextStyle(
+  //                       fontSize: 16,
+  //                       fontWeight: FontWeight.bold,
+  //                     ),
+  //                   ),
+  //                 ),
+  //               ),
+  //             );
+  //           },
+  //         ),
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.of(context).pop(),
+  //           child: const Text('취소'),
+  //         ),
+  //                ],
+  //      ),
+  //    );
+  //  }
    
-   Future<bool?> _showConfirmationDialog(int year, int month) async {
-     final monthNames = [
-       '1월', '2월', '3월', '4월', '5월', '6월',
-       '7월', '8월', '9월', '10월', '11월', '12월'
-     ];
-     
-     return await showDialog<bool>(
-       context: context,
-       builder: (context) => AlertDialog(
-         title: const Text('선택 확인'),
-         content: Text('선택하신 날짜가 $year년 ${monthNames[month - 1]}이 맞나요?'),
-         actions: [
-           TextButton(
-             onPressed: () => Navigator.of(context).pop(false),
-             child: const Text('아니요'),
-           ),
-           TextButton(
-             onPressed: () => Navigator.of(context).pop(true),
-             child: const Text('예'),
-           ),
-         ],
-       ),
-     );
-   }
+
    
    Future<void> _showWeekStartDayDialog() async {
      final settingsService = SettingsService();
