@@ -45,8 +45,16 @@ class _WeatherWidgetState extends State<WeatherWidget> {
     });
 
     try {
+      print('🌤️ WeatherWidget: 날씨 데이터 로드 시작');
       final weatherService = LocationWeatherService();
       final weather = await weatherService.fetchAndSaveLocationWeather();
+      
+      print('🌤️ WeatherWidget: 날씨 데이터 로드 완료 - ${weather != null ? '성공' : '실패'}');
+      if (weather != null) {
+        print('🌤️ WeatherWidget: 날씨 데이터 구조 - ${weather.keys.toList()}');
+        print('🌤️ WeatherWidget: 온도 - ${weather['main']?['temp']}');
+        print('🌤️ WeatherWidget: 날씨 설명 - ${weather['weather']?[0]?['description']}');
+      }
       
       if (mounted) {
         setState(() {
@@ -55,9 +63,10 @@ class _WeatherWidgetState extends State<WeatherWidget> {
         });
       }
     } catch (e) {
+      print('❌ WeatherWidget: 날씨 데이터 로드 실패 - $e');
       if (mounted) {
         setState(() {
-          _errorMessage = '날씨 정보를 가져올 수 없습니다';
+          _errorMessage = '날씨 정보를 가져올 수 없습니다: $e';
           _isLoading = false;
         });
       }
@@ -67,8 +76,9 @@ class _WeatherWidgetState extends State<WeatherWidget> {
   String _getWeatherAdvice() {
     if (_weatherData == null) return '날씨 정보를 확인해보세요';
     
-    final temp = _weatherData!['temperature'] as double? ?? 0;
-    final condition = _weatherData!['condition'] as String? ?? '';
+    // OpenWeatherMap API 응답 구조에 맞게 수정
+    final temp = (_weatherData!['main']?['temp'] as num?)?.toDouble() ?? 0;
+    final condition = (_weatherData!['weather']?[0]?['description'] as String?) ?? '';
     
     // 온도 기반 기본 조언
     String advice = '';
@@ -168,7 +178,7 @@ class _WeatherWidgetState extends State<WeatherWidget> {
               Row(
                 children: [
                   Text(
-                    '${_weatherData!['temperature']?.toStringAsFixed(1) ?? 'N/A'}°C',
+                    '${(_weatherData!['main']?['temp'] as num?)?.toStringAsFixed(1) ?? 'N/A'}°C',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 24,
@@ -178,7 +188,7 @@ class _WeatherWidgetState extends State<WeatherWidget> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      _weatherData!['condition'] ?? '날씨 정보 없음',
+                      _weatherData!['weather']?[0]?['description'] ?? '날씨 정보 없음',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,

@@ -4,8 +4,15 @@ import '../services/location_weather_service.dart';
 import '../services/event_service.dart';
 import '../services/chat_briefing_service.dart';
 import '../services/chat_service.dart';
+import '../services/settings_service.dart';
 import '../models/event.dart';
 import '../widgets/event_form.dart';
+import '../widgets/weather_widget.dart';
+import '../widgets/location_widget.dart';
+import '../widgets/health_widget.dart';
+import '../widgets/learning_widget.dart';
+import '../widgets/style_widget.dart';
+import '../widgets/travel_widget.dart';
 import 'chat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -26,11 +33,20 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _currentAddress;
   bool _isLoading = true;
   bool _isAiLoading = false;
+  Set<String> _selectedAiModes = {'weather'}; // 기본값
 
   @override
   void initState() {
     super.initState();
     _loadHomeData();
+    _loadAiModeSettings();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 설정이 변경되었을 때 AI 모드 설정을 다시 로드
+    _loadAiModeSettings();
   }
 
   Future<void> _loadHomeData() async {
@@ -59,6 +75,21 @@ class _HomeScreenState extends State<HomeScreen> {
     
     // AI 추천은 별도로 비동기 로드 (화면이 먼저 표시된 후)
     _loadAiRecommendation();
+  }
+
+  Future<void> _loadAiModeSettings() async {
+    try {
+      final settings = await SettingsService().getAllSettings();
+      if (mounted) {
+        setState(() {
+          _selectedAiModes = Set<String>.from(
+            settings['selectedAiModes'] ?? ['weather'],
+          );
+        });
+      }
+    } catch (e) {
+      print('AI 모드 설정 로드 실패: $e');
+    }
   }
 
   Future<void> _loadWeatherData() async {
@@ -636,6 +667,72 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildAiModeWidgets() {
+    return Column(
+      children: [
+        // Weather Widget
+        if (_selectedAiModes.contains('weather'))
+          WeatherWidget(
+            isEnabled: true,
+            onTap: () {
+              // 날씨 위젯 탭 시 동작
+              print('날씨 위젯 탭됨');
+            },
+          ),
+        
+        // Location Widget
+        if (_selectedAiModes.contains('location'))
+          LocationWidget(
+            isEnabled: true,
+            onTap: () {
+              // 위치 위젯 탭 시 동작
+              print('위치 위젯 탭됨');
+            },
+          ),
+        
+        // Health Widget
+        if (_selectedAiModes.contains('health'))
+          HealthWidget(
+            isEnabled: true,
+            onTap: () {
+              // 건강 위젯 탭 시 동작
+              print('건강 위젯 탭됨');
+            },
+          ),
+        
+        // Learning Widget
+        if (_selectedAiModes.contains('learning'))
+          LearningWidget(
+            isEnabled: true,
+            onTap: () {
+              // 학습 위젯 탭 시 동작
+              print('학습 위젯 탭됨');
+            },
+          ),
+        
+        // Style Widget
+        if (_selectedAiModes.contains('style'))
+          StyleWidget(
+            isEnabled: true,
+            onTap: () {
+              // 스타일 위젯 탭 시 동작
+              print('스타일 위젯 탭됨');
+            },
+          ),
+        
+        // Travel Widget
+        if (_selectedAiModes.contains('travel'))
+          TravelWidget(
+            isEnabled: true,
+            onTap: () {
+              // 여행 위젯 탭 시 동작
+              print('여행 위젯 탭됨');
+            },
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -686,10 +783,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     
                     // 날씨 카드
                     _buildWeatherAndAiCard(),
-                    
                     // 오늘 일정 카드
-                    _buildTodayEventsCard(),
-                    
+                    _buildTodayEventsCard(),                   
+                    // AI 모드 위젯들
+                    _buildAiModeWidgets(),
                     const SizedBox(height: 20),
                   ],
                 ),

@@ -159,14 +159,21 @@ class LocationWeatherService {
   Future<Map<String, dynamic>?> fetchWeather(double lat, double lon) async {
     try {
       final url = 'https://api.openweathermap.org/data/2.5/weather?lat=$lat&lon=$lon&appid=$_weatherApiKey&units=metric&lang=kr';
+      print('🌤️ LocationWeatherService: 날씨 API 호출 - $url');
+      
       final response = await http.get(Uri.parse(url));
+      print('🌤️ LocationWeatherService: API 응답 상태 코드 - ${response.statusCode}');
       
       if (response.statusCode == 200) {
-        return json.decode(response.body);
+        final weatherData = json.decode(response.body);
+        print('🌤️ LocationWeatherService: 날씨 데이터 파싱 성공');
+        return weatherData;
+      } else {
+        print('❌ LocationWeatherService: API 응답 실패 - ${response.statusCode}: ${response.body}');
       }
       return null;
     } catch (e) {
-      print('날씨 조회 실패: $e');
+      print('❌ LocationWeatherService: 날씨 조회 실패: $e');
       return null;
     }
   }
@@ -198,12 +205,20 @@ class LocationWeatherService {
   /// 위치 저장 후 날씨 조회 (가장 많이 사용되는 메서드)
   Future<Map<String, dynamic>?> fetchAndSaveLocationWeather() async {
     try {
+      print('📍 LocationWeatherService: 위치 업데이트 시작');
       await updateAndSaveCurrentLocation();
+      print('📍 LocationWeatherService: 위치 업데이트 완료 - 위도: $_latitude, 경도: $_longitude');
+      
       if (hasSavedLocation) {
-        return await fetchWeather(_latitude!, _longitude!);
+        print('🌤️ LocationWeatherService: 날씨 조회 시작');
+        final weather = await fetchWeather(_latitude!, _longitude!);
+        print('🌤️ LocationWeatherService: 날씨 조회 완료 - ${weather != null ? '성공' : '실패'}');
+        return weather;
+      } else {
+        print('❌ LocationWeatherService: 저장된 위치 정보가 없음');
       }
     } catch (e) {
-      print('위치 저장 및 날씨 조회 실패: $e');
+      print('❌ LocationWeatherService: 위치 저장 및 날씨 조회 실패: $e');
     }
     return null;
   }
