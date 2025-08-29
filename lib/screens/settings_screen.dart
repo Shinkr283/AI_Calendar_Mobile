@@ -25,6 +25,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool _isDailyNotificationEnabled = true;
   TimeOfDay _notificationTime = const TimeOfDay(hour: 9, minute: 0);
+  
+  // AI 모드 설정
+  Set<String> _selectedAiModes = {'health'}; // 기본값: 건강만 선택
+  final Map<String, String> _aiModes = {
+    'health': '건강',
+    'learning': '학습', 
+    'style': '스타일',
+    'travel': '여행',
+  };
 
   @override
   void initState() {
@@ -61,6 +70,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _isDarkMode = settings['isDarkMode'];
           _isDailyNotificationEnabled = settings['isDailyNotificationEnabled'];
           _notificationTime = settings['notificationTime'];
+          _selectedAiModes = Set<String>.from(settings['selectedAiModes'] ?? ['health']);
         });
       }
     } catch (e) {
@@ -74,6 +84,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await SettingsService().setIsDarkMode(_isDarkMode);
       await SettingsService().setIsDailyNotificationEnabled(_isDailyNotificationEnabled);
       await SettingsService().setNotificationTime(_notificationTime);
+      await SettingsService().setSelectedAiModes(_selectedAiModes.toList());
     } catch (e) {
       print('설정 저장 실패: $e');
     }
@@ -101,8 +112,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     }
   }
-
-
 
   Future<void> _selectNotificationTime() async {
     final TimeOfDay? picked = await showTimePicker(
@@ -139,6 +148,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   String _getWeekStartDayText(int day) {
     return day == 0 ? '일요일' : '월요일';
+  }
+
+  // AI 모드별 아이콘 반환
+  IconData _getAiModeIcon(String mode) {
+    switch (mode) {
+      case 'health':
+        return Icons.favorite;
+      case 'learning':
+        return Icons.school;
+      case 'style':
+        return Icons.checkroom;
+      case 'travel':
+        return Icons.flight;
+      default:
+        return Icons.psychology;
+    }
+  }
+
+  // AI 모드별 색상 반환
+  Color _getAiModeColor(String mode) {
+    switch (mode) {
+      case 'health':
+        return Colors.red;
+      case 'learning':
+        return Colors.blue;
+      case 'style':
+        return Colors.purple;
+      case 'travel':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
   }
 
   Widget _buildUserSection() {
@@ -362,6 +403,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
               ),
+
+                                            // AI 모드 섹션
+               _buildSettingsSection(
+                 'AI 모드',
+                 [
+                   ..._aiModes.entries.map((entry) => _buildSettingsTile(
+                     icon: _getAiModeIcon(entry.key),
+                     title: entry.value,
+                     subtitle: _selectedAiModes.contains(entry.key) 
+                         ? '${entry.value} 관련 AI 응답 활성화'
+                         : '${entry.value} 관련 AI 응답 비활성화',
+                     trailing: Switch(
+                       value: _selectedAiModes.contains(entry.key),
+                       onChanged: (value) async {
+                         setState(() {
+                           if (value == true) {
+                             _selectedAiModes.add(entry.key);
+                           } else {
+                             _selectedAiModes.remove(entry.key);
+                           }
+                         });
+                         await _saveSettings();
+                         
+                         if (mounted) {
+                           final selectedCount = _selectedAiModes.length;
+                           final message = value 
+                               ? '${entry.value} AI 모드가 활성화되었습니다'
+                               : '${entry.value} AI 모드가 비활성화되었습니다';
+                           ScaffoldMessenger.of(context).showSnackBar(
+                             SnackBar(
+                               content: Text(message),
+                               backgroundColor: value ? Colors.green : Colors.orange,
+                             ),
+                           );
+                         }
+                       },
+                     ),
+                     iconColor: _selectedAiModes.contains(entry.key) 
+                         ? _getAiModeColor(entry.key) 
+                         : Colors.grey,
+                   )),
+                 ],
+               ),
 
               // 알림 섹션
               _buildSettingsSection(

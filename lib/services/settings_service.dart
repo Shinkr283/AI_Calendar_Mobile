@@ -10,6 +10,7 @@ class SettingsService {
   static const String _isDailyNotificationEnabledKey = 'is_daily_notification_enabled';
   static const String _notificationTimeHourKey = 'notification_time_hour';
   static const String _notificationTimeMinuteKey = 'notification_time_minute';
+  static const String _selectedAiModeKey = 'selected_ai_mode';
 
   // 싱글톤 패턴
   static final SettingsService _instance = SettingsService._internal();
@@ -95,6 +96,27 @@ class SettingsService {
     }
   }
 
+  // AI 모드 설정 (다중 선택 지원)
+  Future<List<String>> getSelectedAiModes() async {
+    await _initPrefs();
+    return _prefs!.getStringList(_selectedAiModeKey) ?? ['health'];
+  }
+
+  Future<void> setSelectedAiModes(List<String> modes) async {
+    await _initPrefs();
+    await _prefs!.setStringList(_selectedAiModeKey, modes);
+  }
+
+  // 기존 단일 선택 메서드 (하위 호환성)
+  Future<String> getSelectedAiMode() async {
+    final modes = await getSelectedAiModes();
+    return modes.isNotEmpty ? modes.first : 'health';
+  }
+
+  Future<void> setSelectedAiMode(String mode) async {
+    await setSelectedAiModes([mode]);
+  }
+
   // 모든 설정을 한 번에 로드
   Future<Map<String, dynamic>> getAllSettings() async {
     return {
@@ -103,6 +125,7 @@ class SettingsService {
       'isCalendarSynced': await getIsCalendarSynced(),
       'isDailyNotificationEnabled': await getIsDailyNotificationEnabled(),
       'notificationTime': await getNotificationTime(),
+      'selectedAiModes': await getSelectedAiModes(),
     };
   }
 
