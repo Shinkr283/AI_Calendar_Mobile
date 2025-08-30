@@ -8,26 +8,84 @@ import '../models/chat_message.dart';
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
   static Database? _database;
+  static bool _isInitializing = false;
+  static DateTime? _lastUsed;
+  static Timer? _cleanupTimer;
   
   factory DatabaseService() => _instance;
   
-  DatabaseService._internal();
+  DatabaseService._internal() {
+    // 자동 정리 타이머 시작
+    _startAutoCleanup();
+  }
 
-  /// DB 연결 후 작업 실행, 항상 연결 해제
+  /// DB 연결 후 작업 실행 - 연결 유지
   Future<T> _withDb<T>(Future<T> Function(Database db) action) async {
     final db = await database;
     try {
       return await action(db);
-    } finally {
-      await db.close();
-      _database = null;
+    } catch (e) {
+      print('❌ 데이터베이스 작업 실패: $e');
+      rethrow;
     }
+    // finally 블록 제거 - 연결 유지
   }
 
   Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDatabase();
-    return _database!;
+    if (_database != null) {
+      _lastUsed = DateTime.now();
+      return _database!;
+    }
+    
+    // 초기화 중복 방지
+    if (_isInitializing) {
+      while (_isInitializing) {
+        await Future.delayed(const Duration(milliseconds: 10));
+      }
+      _lastUsed = DateTime.now();
+      return _database!;
+    }
+    
+    _isInitializing = true;
+    try {
+      _database = await _initDatabase();
+      _lastUsed = DateTime.now();
+      return _database!;
+    } finally {
+      _isInitializing = false;
+    }
+  }
+
+  /// 자동 정리 타이머 시작
+  void _startAutoCleanup() {
+    _cleanupTimer?.cancel();
+    _cleanupTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+      _autoCloseIfIdle();
+    });
+  }
+
+  /// 자동 연결 해제 (5분 이상 미사용 시)
+  Future<void> _autoCloseIfIdle() async {
+    if (_database != null && _lastUsed != null) {
+      final idleTime = DateTime.now().difference(_lastUsed!);
+      if (idleTime.inMinutes >= 5) {
+        await _database!.close();
+        _database = null;
+        _lastUsed = null;
+        print('🔒 데이터베이스 연결 자동 해제 (5분 미사용)');
+      }
+    }
+  }
+
+  /// 앱 종료 시 연결 해제
+  Future<void> dispose() async {
+    _cleanupTimer?.cancel();
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+      _lastUsed = null;
+      print('🔒 데이터베이스 연결 종료');
+    }
   }
 
   Future<Database> _initDatabase() async {
@@ -44,7 +102,7 @@ class DatabaseService {
          onCreate: _createDatabase,
        );
       
-      print('✅ 데이터베이스 초기화 완료');
+      print('✅ 데이터베이스 연결 완료');
       
       // 테이블 존재 확인
       final tables = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
@@ -149,7 +207,7 @@ class DatabaseService {
       await db.execute('CREATE INDEX IF NOT EXISTS idx_chat_messages_timestamp ON chat_messages(timestamp)');
       print('✅ 모든 인덱스 생성 완료');
       
-      print('🎉 데이터베이스 테이블 생성 모두 완료!');
+      print('✅ 데이터베이스 테이블 생성 완료');
     } catch (e, stackTrace) {
       print('❌ 테이블 생성 실패: $e');
       print('📍 스택 트레이스: $stackTrace');
@@ -178,6 +236,90 @@ class DatabaseService {
       await txn.delete('events');
       await txn.delete('user_profiles');
     });
+  }
+
+  /// 배치 작업 - 여러 일정을 한 번에 삽입
+  Future<void> batchInsertEvents(List<Event> events) async {
+    if (events.isEmpty) return;
+    
+    final db = await database;
+    await db.transaction((txn) async {
+      for (final event in events) {
+        await txn.insert('events', event.toMap());
+      }
+    });
+    print('✅ ${events.length}개 일정 배치 삽입 완료');
+  }
+
+  /// 배치 작업 - 여러 일정을 한 번에 업데이트
+  Future<void> batchUpdateEvents(List<Event> events) async {
+    if (events.isEmpty) return;
+    
+    final db = await database;
+    await db.transaction((txn) async {
+      for (final event in events) {
+        await txn.update(
+          'events',
+          event.toMap(),
+          where: 'id = ?',
+          whereArgs: [event.id],
+        );
+      }
+    });
+    print('✅ ${events.length}개 일정 배치 업데이트 완료');
+  }
+
+  /// 배치 작업 - 여러 일정을 한 번에 삭제
+  Future<void> batchDeleteEvents(List<String> eventIds) async {
+    if (eventIds.isEmpty) return;
+    
+    final db = await database;
+    await db.transaction((txn) async {
+      for (final id in eventIds) {
+        await txn.delete('events', where: 'id = ?', whereArgs: [id]);
+      }
+    });
+    print('✅ ${eventIds.length}개 일정 배치 삭제 완료');
+  }
+
+  /// 성능 최적화된 일정 조회 (필요한 컬럼만 선택)
+  Future<List<Event>> getEventsOptimized({
+    DateTime? startDate,
+    DateTime? endDate,
+    bool? isCompleted,
+    List<String>? columns,
+  }) async {
+    final db = await database;
+    
+    String whereClause = '';
+    List<dynamic> whereArgs = [];
+    
+    if (startDate != null) {
+      whereClause += 'startTime >= ?';
+      whereArgs.add(startDate.millisecondsSinceEpoch);
+    }
+    
+    if (endDate != null) {
+      if (whereClause.isNotEmpty) whereClause += ' AND ';
+      whereClause += 'endTime <= ?';
+      whereArgs.add(endDate.millisecondsSinceEpoch);
+    }
+      
+    if (isCompleted != null) {
+      if (whereClause.isNotEmpty) whereClause += ' AND ';
+      whereClause += 'isCompleted = ?';
+      whereArgs.add(isCompleted ? 1 : 0);
+    }
+    
+    final maps = await db.query(
+      'events',
+      columns: columns, // 필요한 컬럼만 선택
+      where: whereClause.isNotEmpty ? whereClause : null,
+      whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
+      orderBy: 'startTime ASC',
+    );
+    
+    return maps.map((map) => Event.fromMap(map)).toList();
   }
 
   // 사용자 프로필 CRUD

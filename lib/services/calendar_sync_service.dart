@@ -102,7 +102,23 @@ class CalendarSyncService {
         );
       }
 
-      // 2. 로컬에서 모든 일정 가져오기 (선로드 맵 사용으로 DB I/O 최적화)
+      // 2. 삭제 대기 큐 처리 (로컬에서 삭제된 건을 구글에서도 삭제)
+      final pendingDeletes = prefs.getStringList('pending_google_deletes') ?? <String>[];
+      if (!readonly && pendingDeletes.isNotEmpty) {
+        for (final gid in List<String>.from(pendingDeletes)) {
+          try {
+            await svc.deleteEventById(gid);
+            pendingDeletes.remove(gid);
+            print('🗑️ 구글에서 일정 삭제 완료: $gid');
+          } catch (e) {
+            print('❌ 구글에서 일정 삭제 실패: $gid - $e');
+            // 실패 시 다음 동기화 때 재시도
+          }
+        }
+        await prefs.setStringList('pending_google_deletes', pendingDeletes);
+      }
+
+      // 3. 로컬에서 모든 일정 가져오기 (선로드 맵 사용으로 DB I/O 최적화)
       final localEvents = await EventService().getEvents(
         startDate: start,
         endDate: end,
@@ -112,7 +128,7 @@ class CalendarSyncService {
       var pushed = 0;
       var updated = 0;
 
-      // 3. 구글 일정을 로컬로 동기화 (선로드 맵 사용)
+      // 4. 구글 일정을 로컬로 동기화 (선로드 맵 사용)
       final syncedIds = <String>{};
       
       // 로컬 이벤트를 Google ID 기준으로 맵 구성
@@ -163,27 +179,34 @@ class CalendarSyncService {
           }
         } else {
           // 로컬에 해당 Google 이벤트가 없으면 새로 삽입
-          final createdLocal = await EventService().createEvent(
-            title: ev.summary ?? '(제목 없음)',
-            description: ev.description ?? '',
-            startTime: startTime,
-            endTime: endTime,
-            location: ev.location ?? '',
-            alarmMinutesBefore: 10,
-            isAllDay: ev.start?.dateTime == null && ev.start?.date != null,
-            priority: 0, // 새로 생성되는 이벤트는 우선순위 0으로 고정
-          );
-          final bound = createdLocal.copyWith(
-            googleEventId: gId,
-            updatedAt: DateTime.now(),
-          );
-          await EventService().updateEvent(bound);
-          inserted++;
+          // 단, 삭제 대기 중인 일정은 제외
+          final pendingDeletes = prefs.getStringList('pending_google_deletes') ?? <String>[];
+          if (!pendingDeletes.contains(gId)) {
+            final createdLocal = await EventService().createEvent(
+              title: ev.summary ?? '(제목 없음)',
+              description: ev.description ?? '',
+              startTime: startTime,
+              endTime: endTime,
+              location: ev.location ?? '',
+              alarmMinutesBefore: 10,
+              isAllDay: ev.start?.dateTime == null && ev.start?.date != null,
+              priority: 0, // 새로 생성되는 이벤트는 우선순위 0으로 고정
+            );
+            final bound = createdLocal.copyWith(
+              googleEventId: gId,
+              updatedAt: DateTime.now(),
+            );
+            await EventService().updateEvent(bound);
+            inserted++;
+            print('✅ 구글 일정을 로컬로 동기화: ${ev.summary}');
+          } else {
+            print('⏭️ 삭제 대기 중인 일정 건너뜀: ${ev.summary} ($gId)');
+          }
         }
         syncedIds.add(gId);
       }
 
-      // 4. 로컬 일정을 구글로 푸시 (readonly가 false일 때만)
+      // 5. 로컬 일정을 구글로 푸시 (readonly가 false일 때만)
       if (!readonly) {
         for (final localEvent in localEvents) {
           // googleEventId가 없거나 비어있는 경우에만 푸시
@@ -215,7 +238,7 @@ class CalendarSyncService {
         }
       }
 
-      // 5. 구글에서 사라진 일정 감지 및 삭제
+      // 6. 구글에서 사라진 일정 감지 및 삭제
       final currentGoogleIds = items.where((e) => e.id != null).map((e) => e.id!).toSet();
       final previousSyncedIds = prefs.getStringList('google_synced_event_ids')?.toSet() ?? <String>{};
       
@@ -229,7 +252,7 @@ class CalendarSyncService {
         }
       }
       
-      // 6. 동기화 상태 저장
+      // 7. 동기화 상태 저장
       await prefs.setStringList('google_synced_event_ids', syncedIds.toList());
       await prefs.setInt('google_last_sync_updated_ms', DateTime.now().millisecondsSinceEpoch);
 
@@ -293,20 +316,21 @@ class CalendarSyncService {
 
     // prefs 이미 로드됨
     final syncedIds = prefs.getStringList('google_synced_event_ids')?.toSet() ?? <String>{};
+    
     // 삭제 대기 큐 처리(로컬에서 삭제된 건을 구글에서도 삭제)
-    if (!readonly) {
-      final pendingDeletes = prefs.getStringList('pending_google_deletes') ?? <String>[];
-      if (pendingDeletes.isNotEmpty) {
-        for (final gid in List<String>.from(pendingDeletes)) {
-          try {
-            await GoogleCalendarService(token).deleteEventById(gid);
-            pendingDeletes.remove(gid);
-          } catch (_) {
-            // 실패 시 다음 동기화 때 재시도
-          }
+    final pendingDeletes = prefs.getStringList('pending_google_deletes') ?? <String>[];
+    if (!readonly && pendingDeletes.isNotEmpty) {
+      for (final gid in List<String>.from(pendingDeletes)) {
+        try {
+          await GoogleCalendarService(token).deleteEventById(gid);
+          pendingDeletes.remove(gid);
+          print('🗑️ 구글에서 일정 삭제 완료: $gid');
+        } catch (e) {
+          print('❌ 구글에서 일정 삭제 실패: $gid - $e');
+          // 실패 시 다음 동기화 때 재시도
         }
-        await prefs.setStringList('pending_google_deletes', pendingDeletes);
       }
+      await prefs.setStringList('pending_google_deletes', pendingDeletes);
     }
 
     var inserted = 0;
@@ -385,26 +409,32 @@ class CalendarSyncService {
           continue;
         }
         // 로컬에 해당 Google 이벤트가 없으면 새로 삽입
-        final createdLocal = await EventService().createEvent(
-          title: ev.summary ?? '(제목 없음)',
-          description: ev.description ?? '',
-          startTime: startTime,
-          endTime: endTime,
-          location: ev.location ?? '',
-          alarmMinutesBefore: 10,
-          isAllDay: ev.start?.dateTime == null && ev.start?.date != null,
-          priority: 0, // 새로 생성되는 이벤트는 우선순위 0으로 고정
-        );
-        final bound = createdLocal.copyWith(
-          googleEventId: gId,
-          updatedAt: DateTime.now(),
-        );
-        await EventService().updateEvent(bound);
-        syncedIds.add(gId);
-        // 맵 갱신
-        localByGid[gId] = bound;
-        localByTitleStartKey['${bound.title.toLowerCase()}|${bound.startTime.millisecondsSinceEpoch}'] = bound;
-        inserted++;
+        // 단, 삭제 대기 중인 일정은 제외
+        if (!pendingDeletes.contains(gId)) {
+          final createdLocal = await EventService().createEvent(
+            title: ev.summary ?? '(제목 없음)',
+            description: ev.description ?? '',
+            startTime: startTime,
+            endTime: endTime,
+            location: ev.location ?? '',
+            alarmMinutesBefore: 10,
+            isAllDay: ev.start?.dateTime == null && ev.start?.date != null,
+            priority: 0, // 새로 생성되는 이벤트는 우선순위 0으로 고정
+          );
+          final bound = createdLocal.copyWith(
+            googleEventId: gId,
+            updatedAt: DateTime.now(),
+          );
+          await EventService().updateEvent(bound);
+          syncedIds.add(gId);
+          // 맵 갱신
+          localByGid[gId] = bound;
+          localByTitleStartKey['${bound.title.toLowerCase()}|${bound.startTime.millisecondsSinceEpoch}'] = bound;
+          inserted++;
+          print('✅ 구글 일정을 로컬로 동기화: ${ev.summary}');
+        } else {
+          print('⏭️ 삭제 대기 중인 일정 건너뜀: ${ev.summary} ($gId)');
+        }
       }
       continue;
     }

@@ -9,6 +9,9 @@ class MbtiService {
   factory MbtiService() => _instance;
   MbtiService._internal();
 
+  // MBTI 캐시
+  String? _cachedMbti;
+
   // MBTI 관련 Function declaration
   static const Map<String, dynamic> setMbtiFunction = {
     'name': 'setMbtiType',
@@ -54,6 +57,9 @@ class MbtiService {
         // PromptService 캐시 업데이트
         await PromptService().updateMbti(mbti.toUpperCase());
         
+        // MBTI 캐시 업데이트 (변경 시에만)
+        _updateMbtiCache(mbti.toUpperCase());
+        
         return {'status': '성공적으로 ${mbti.toUpperCase()}로 설정되었습니다. 이제 새로운 성격으로 대화하겠습니다.'};
       } catch (e) {
         return {'status': '오류: MBTI를 설정하는 동안 데이터베이스에 문제가 발생했습니다.'};
@@ -63,11 +69,42 @@ class MbtiService {
     }
   }
 
-  // 현재 사용자의 MBTI 유형 가져오기
+  // 현재 사용자의 MBTI 유형 가져오기 (캐시 적용)
   Future<String> getCurrentMbtiType() async {
+    // 캐시가 있는 경우 캐시된 값 반환
+    if (_cachedMbti != null) {
+      print('📋 MbtiService: 캐시된 MBTI 사용 - $_cachedMbti');
+      return _cachedMbti!;
+    }
+    
+    // 캐시가 없는 경우 데이터베이스에서 가져오기 (프로그램 시작 시)
     final userService = UserService();
     final user = await userService.getCurrentUser();
-    return user?.mbtiType ?? 'INFP';
+    final mbti = user?.mbtiType ?? 'INFP';
+    
+    print('🗄️ MbtiService: 데이터베이스에서 MBTI 가져옴 - $mbti (사용자: ${user?.name})');
+    
+    // 캐시 업데이트
+    _updateMbtiCache(mbti);
+    
+    return mbti;
+  }
+
+  // MBTI 캐시 업데이트 (변경 시에만)
+  void _updateMbtiCache(String newMbti) {
+    final oldMbti = _cachedMbti;
+    _cachedMbti = newMbti;
+    
+    // MBTI가 변경된 경우에만 로그 출력
+    if (oldMbti != null && oldMbti != newMbti) {
+      print('🔄 MBTI 변경: $oldMbti → $newMbti');
+    }
+  }
+
+  // MBTI 캐시 무효화 (프로그램 시작 시 사용)
+  void invalidateMbtiCache() {
+    _cachedMbti = null;
+    print('🗑️ MBTI 캐시 무효화됨');
   }
 
   // MBTI 프로필 정보 가져오기

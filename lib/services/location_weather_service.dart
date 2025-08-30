@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import '../config/api_keys.dart';
 
 /// 위치 정보와 날씨 정보를 통합 관리하는 서비스
 class LocationWeatherService {
@@ -20,8 +21,15 @@ class LocationWeatherService {
     return _instance!;
   }
 
-  // API 키
-  final String _weatherApiKey = '7091ebdaf31310384aa6c653de1948d0';
+  // 날씨 캐싱을 위한 필드들
+  Map<String, dynamic>? _cachedWeatherData;
+  DateTime? _weatherLastUpdated;
+  
+  // 중복 API 호출 방지를 위한 필드
+  Future<Map<String, dynamic>?>? _pendingWeatherRequest;
+  
+  // 위치 정보 중복 호출 방지를 위한 필드
+  Future<void>? _pendingLocationRequest;
 
   // ==== Getter 메서드들 ====
   double? get latitude => _latitude;
@@ -29,14 +37,19 @@ class LocationWeatherService {
   String? get savedAddress => _savedAddress;
   DateTime? get lastUpdated => _lastUpdated;
   bool get hasSavedLocation => _latitude != null && _longitude != null;
-  bool get hasValidLocation => hasSavedLocation;
-  String? get currentAddress => _savedAddress;
   
-  /// 위치 정보가 최신인지 확인 (5분 이내)
+  /// 위치 정보가 최신인지 확인 (2분 이내)
   bool get isLocationFresh {
     if (_lastUpdated == null) return false;
     final difference = DateTime.now().difference(_lastUpdated!);
-    return difference.inMinutes < 5;
+    return difference.inMinutes < 2;
+  }
+
+  /// 날씨 정보가 최신인지 확인 (2분 이내)
+  bool get isWeatherFresh {
+    if (_weatherLastUpdated == null || _cachedWeatherData == null) return false;
+    final difference = DateTime.now().difference(_weatherLastUpdated!);
+    return difference.inMinutes < 2;
   }
 
   // ==== 위치 관련 메서드들 ====
@@ -53,15 +66,35 @@ class LocationWeatherService {
     saveLocation(position.latitude, position.longitude);
   }
 
-  /// 현재 위치를 가져와서 저장 (캐시 활용)
+  /// 현재 위치를 가져와서 저장 (캐시 및 중복 호출 방지 적용)
   Future<void> updateAndSaveCurrentLocation({LocationAccuracy accuracy = LocationAccuracy.high}) async {
-    // 최신 위치가 있으면 재사용
+    // 캐시된 위치가 있고 2분 이내라면 캐시된 데이터 사용
     if (hasSavedLocation && isLocationFresh) {
+      print('📍 LocationWeatherService: 캐시된 위치 정보 사용 (${DateTime.now().difference(_lastUpdated!).inSeconds}초 전)');
       return;
     }
     
+    // 진행 중인 요청이 있으면 해당 요청을 기다림
+    if (_pendingLocationRequest != null) {
+      print('📍 LocationWeatherService: 진행 중인 위치 요청 대기 중...');
+      await _pendingLocationRequest!;
+      return;
+    }
+    
+    // 새로운 위치 요청 시작
+    _pendingLocationRequest = _getCurrentPositionWithCache(accuracy);
+    try {
+      await _pendingLocationRequest!;
+    } finally {
+      _pendingLocationRequest = null;
+    }
+  }
+
+  /// 캐시를 고려한 현재 위치 조회 내부 메서드
+  Future<void> _getCurrentPositionWithCache(LocationAccuracy accuracy) async {
     final position = await getCurrentPosition(accuracy: accuracy);
     saveLocationFromPosition(position);
+    print('📍 LocationWeatherService: 새로운 위치 정보 저장 완료');
     
     // 주소도 함께 저장 (비동기 처리)
     _updateAddressAsync(position);
@@ -155,10 +188,34 @@ class LocationWeatherService {
 
   // ==== 날씨 관련 메서드들 ====
 
-  /// 기본 날씨 조회 (위도/경도로)
+  /// 기본 날씨 조회 (위도/경도로) - 캐싱 및 중복 호출 방지 적용
   Future<Map<String, dynamic>?> fetchWeather(double lat, double lon) async {
+    // 캐시된 날씨가 있고 2분 이내라면 캐시된 데이터 반환
+    if (isWeatherFresh && _cachedWeatherData != null) {
+      print('🌤️ LocationWeatherService: 캐시된 날씨 정보 사용 (${DateTime.now().difference(_weatherLastUpdated!).inSeconds}초 전)');
+      return _cachedWeatherData;
+    }
+    
+    // 진행 중인 요청이 있으면 해당 요청을 기다림
+    if (_pendingWeatherRequest != null) {
+      print('🌤️ LocationWeatherService: 진행 중인 요청 대기 중...');
+      return await _pendingWeatherRequest!;
+    }
+    
+    // 새로운 요청 시작
+    _pendingWeatherRequest = _fetchWeatherFromAPI(lat, lon);
     try {
-      final url = 'https://api.openweathermap.org/data/2.5/weather?lat=$lat&lon=$lon&appid=$_weatherApiKey&units=metric&lang=kr';
+      final result = await _pendingWeatherRequest!;
+      return result;
+    } finally {
+      _pendingWeatherRequest = null;
+    }
+  }
+
+  /// 실제 API 호출을 수행하는 내부 메서드
+  Future<Map<String, dynamic>?> _fetchWeatherFromAPI(double lat, double lon) async {
+    try {
+      final url = 'https://api.openweathermap.org/data/2.5/weather?lat=$lat&lon=$lon&appid=${ApiKeys.weatherApiKey}&units=metric&lang=kr';
       print('🌤️ LocationWeatherService: 날씨 API 호출 - $url');
       
       final response = await http.get(Uri.parse(url));
@@ -167,6 +224,12 @@ class LocationWeatherService {
       if (response.statusCode == 200) {
         final weatherData = json.decode(response.body);
         print('🌤️ LocationWeatherService: 날씨 데이터 파싱 성공');
+        
+        // 날씨 데이터 캐싱
+        _cachedWeatherData = weatherData;
+        _weatherLastUpdated = DateTime.now();
+        print('🌤️ LocationWeatherService: 날씨 정보 캐싱 완료');
+        
         return weatherData;
       } else {
         print('❌ LocationWeatherService: API 응답 실패 - ${response.statusCode}: ${response.body}');
@@ -174,17 +237,6 @@ class LocationWeatherService {
       return null;
     } catch (e) {
       print('❌ LocationWeatherService: 날씨 조회 실패: $e');
-      return null;
-    }
-  }
-
-  /// 현재 위치의 날씨 조회
-  Future<Map<String, dynamic>?> fetchCurrentLocationWeather() async {
-    try {
-      final position = await getCurrentPosition();
-      return await fetchWeather(position.latitude, position.longitude);
-    } catch (e) {
-      print('현재 위치 날씨 조회 실패: $e');
       return null;
     }
   }
@@ -223,23 +275,39 @@ class LocationWeatherService {
     return null;
   }
 
-  // ==== 유틸리티 메서드들 ====
-
-  /// 현재 위치의 위도/경도 반환 (다른 서비스용)
-  Future<Map<String, double>?> getCurrentLocationCoordinates() async {
-    try {
+  /// 캐시된 날씨 정보 강제 새로고침
+  Future<Map<String, dynamic>?> refreshWeatherData() async {
+    if (!hasSavedLocation) {
       await updateAndSaveCurrentLocation();
-      if (hasSavedLocation) {
-        return {
-          'latitude': _latitude!,
-          'longitude': _longitude!,
-        };
-      }
-    } catch (e) {
-      print('위치 좌표 조회 실패: $e');
     }
+    
+    if (hasSavedLocation) {
+      // 캐시 무효화
+      _cachedWeatherData = null;
+      _weatherLastUpdated = null;
+      print('🔄 LocationWeatherService: 날씨 캐시 무효화, 새로고침 시작');
+      return await fetchWeather(_latitude!, _longitude!);
+    }
+    
     return null;
   }
+
+  /// 날씨 캐시 초기화
+  void clearWeatherCache() {
+    _cachedWeatherData = null;
+    _weatherLastUpdated = null;
+    print('🗑️ LocationWeatherService: 날씨 캐시 초기화');
+  }
+
+  /// 위치 정보 강제 새로고침
+  Future<void> refreshLocationData() async {
+    // 캐시 무효화
+    clearSavedLocation();
+    print('🔄 LocationWeatherService: 위치 캐시 무효화, 새로고침 시작');
+    await updateAndSaveCurrentLocation();
+  }
+
+  // ==== 유틸리티 메서드들 ====
 
   /// 저장된 위치 정보 전체 반환
   Map<String, dynamic> getSavedLocationInfo() {
@@ -251,17 +319,6 @@ class LocationWeatherService {
       'hasLocation': hasSavedLocation,
       'isFresh': isLocationFresh,
     };
-  }
-
-  /// 현재 위치 업데이트 (성공/실패 반환)
-  Future<bool> updateCurrentLocation() async {
-    try {
-      await updateAndSaveCurrentLocation();
-      return true;
-    } catch (e) {
-      print('위치 업데이트 실패: $e');
-      return false;
-    }
   }
 
   // ==== 직렬화 메서드들 ====

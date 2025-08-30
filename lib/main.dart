@@ -40,6 +40,15 @@ void main() async {
   // 한국어 날짜 포맷 초기화
   await initializeDateFormatting('ko_KR', null);
 
+  // 데이터베이스 초기화를 먼저 수행
+  try {
+    final databaseService = DatabaseService();
+    await databaseService.database; // 초기화 보장
+    print('✅ 데이터베이스 초기화 완료');
+  } catch (e) {
+    print('❌ 데이터베이스 초기화 실패: $e');
+  }
+
   // 앱 로딩 속도를 위해 일부 초기화를 백그라운드로 이동
   _initializeBackgroundServices();
     runApp(MultiProvider(
@@ -138,16 +147,32 @@ class AICalendarApp extends StatefulWidget {
   State<AICalendarApp> createState() => _AICalendarAppState();
 }
 
-class _AICalendarAppState extends State<AICalendarApp> {
+class _AICalendarAppState extends State<AICalendarApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // 앱 시작 시 한 번만 테마 로드
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<ThemeProvider>().loadTheme();
       }
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    DatabaseService().dispose(); // 앱 종료 시 연결 해제
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.detached) {
+      // 앱이 완전히 종료될 때 데이터베이스 연결 해제
+      DatabaseService().dispose();
+    }
   }
 
   @override

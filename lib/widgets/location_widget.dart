@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../services/location_weather_service.dart';
+import '../services/chat_service.dart';
+import '../screens/chat_screen.dart';
 
 class LocationWidget extends StatefulWidget {
   final bool isEnabled;
   final VoidCallback? onTap;
 
-  const LocationWidget({
-    super.key,
-    required this.isEnabled,
-    this.onTap,
-  });
+  const LocationWidget({super.key, required this.isEnabled, this.onTap});
 
   @override
   State<LocationWidget> createState() => _LocationWidgetState();
@@ -46,18 +45,29 @@ class _LocationWidgetState extends State<LocationWidget> {
 
     try {
       final locationService = LocationWeatherService();
+
+      // 위치 업데이트 시도
       await locationService.updateAndSaveCurrentLocation();
-      
+
+      // 주소가 비어있으면 잠시 기다린 후 다시 확인
+      String? address = locationService.savedAddress;
+      if (address == null || address.isEmpty) {
+        // 주소 변환이 비동기로 처리되므로 잠시 대기
+        await Future.delayed(const Duration(seconds: 2));
+        address = locationService.savedAddress;
+      }
+
       if (mounted) {
         setState(() {
-          _currentAddress = locationService.currentAddress ?? '위치 정보 없음';
+          _currentAddress = address ?? '위치 정보 없음';
           _isLoading = false;
         });
       }
     } catch (e) {
+      print('❌ LocationWidget: 위치 정보 로드 실패 - $e');
       if (mounted) {
         setState(() {
-          _errorMessage = '위치 정보를 가져올 수 없습니다';
+          _errorMessage = '위치 정보를 가져올 수 없습니다: ${e.toString()}';
           _isLoading = false;
         });
       }
@@ -68,10 +78,10 @@ class _LocationWidgetState extends State<LocationWidget> {
     if (_currentAddress.isEmpty || _currentAddress == '위치 정보 없음') {
       return '위치 정보를 확인해보세요';
     }
-    
+
     final now = DateTime.now();
     final hour = now.hour;
-    
+
     if (hour >= 6 && hour < 12) {
       return '좋은 아침입니다! 주변 카페를 찾아보세요';
     } else if (hour >= 12 && hour < 18) {
@@ -83,6 +93,78 @@ class _LocationWidgetState extends State<LocationWidget> {
     }
   }
 
+  // 채팅 화면 표시
+  void _showChatScreen() {
+    // ChatProvider 초기화
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    chatProvider.clearMessages();
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // 드래그 핸들
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // 헤더
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.location_on,
+                      color: Colors.blue,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      '위치 AI 비서',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              // AI 채팅 화면
+              Expanded(
+                child: ChatScreen(
+                  initialEvent: null,
+                  initialTopic: '위치',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!widget.isEnabled) {
@@ -90,10 +172,10 @@ class _LocationWidgetState extends State<LocationWidget> {
     }
 
     return GestureDetector(
-      onTap: widget.onTap,
+      onTap: _showChatScreen,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [Colors.blue.shade300, Colors.blue.shade500],
@@ -114,19 +196,19 @@ class _LocationWidgetState extends State<LocationWidget> {
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.location_on,
-                  color: Colors.white,
-                  size: 24,
-                ),
+                Icon(Icons.location_on, color: Colors.white, size: 22),
                 const SizedBox(width: 8),
-                const Text(
-                  '현재 위치',
-                  style: TextStyle(
+                Text(
+                  _currentAddress.isNotEmpty && _currentAddress != '위치 정보 없음'
+                      ? _currentAddress
+                      : '현재 위치',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const Spacer(),
                 if (_isLoading)
@@ -137,10 +219,20 @@ class _LocationWidgetState extends State<LocationWidget> {
                       strokeWidth: 2,
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
+                  )
+                else
+                  IconButton(
+                    icon: const Icon(
+                      Icons.refresh,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    onPressed: _loadLocationData,
+                    tooltip: '위치 새로고침',
                   ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 7),
             if (_isLoading)
               const Text(
                 '위치 정보를 가져오는 중...',
@@ -152,23 +244,10 @@ class _LocationWidgetState extends State<LocationWidget> {
                 style: const TextStyle(color: Colors.white70, fontSize: 14),
               )
             else ...[
-              Text(
-                _currentAddress,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 7),
               Text(
                 _getLocationAdvice(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                ),
+                style: const TextStyle(color: Colors.white, fontSize: 14),
               ),
             ],
           ],

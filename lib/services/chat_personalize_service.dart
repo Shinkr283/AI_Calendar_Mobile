@@ -1,7 +1,7 @@
-import 'chat_prompt_health_service.dart';
-import 'chat_prompt_learning_service.dart';
-import 'chat_prompt_style_service.dart';
-import 'chat_prompt_travel_service.dart';
+import '../models/chat_prompt_health.dart';
+import '../models/chat_prompt_learning.dart';
+import '../models/chat_prompt_style.dart';
+import '../models/chat_prompt_travel.dart';
 import 'chat_gemini_service.dart';
 
 /// 개인화된 AI 응답을 생성하는 서비스

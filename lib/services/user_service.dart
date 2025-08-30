@@ -55,8 +55,21 @@ class UserService {
     }
     
     // 데이터베이스에서 첫 번째 사용자를 현재 사용자로 설정
-    // 실제 앱에서는 로그인 시스템과 연동해야 함
-    _currentUser = await _databaseService.getFirstUserProfile(); //추가
+    _currentUser = await _databaseService.getFirstUserProfile();
+    
+    // 사용자가 없으면 기본 사용자 생성
+    if (_currentUser == null) {
+      print('👤 UserService: 사용자 프로필이 없어 기본 사용자를 생성합니다.');
+      _currentUser = await createUser(
+        email: 'default@example.com',
+        name: '사용자',
+        mbtiType: 'INFP', // 기본 MBTI
+      );
+      print('👤 UserService: 기본 사용자 생성 완료 - 이름: ${_currentUser?.name}, MBTI: ${_currentUser?.mbtiType}');
+    } else {
+      print('👤 UserService: 기존 사용자 정보 - 이름: ${_currentUser?.name}, MBTI: ${_currentUser?.mbtiType}');
+    }
+    
     return _currentUser;
   }
 
@@ -133,7 +146,11 @@ class UserService {
       // AI 성격도 함께 업데이트
       await setPreference(UserPreferences.aiPersonality, recommendedPersonality);
       
-      return await updateUser(updatedUser);
+      final result = await updateUser(updatedUser);
+      print('👤 UserService: MBTI 업데이트 완료 - 이름: ${result.name}, MBTI: ${result.mbtiType}');
+      return result;
+    } else {
+      print('❌ UserService: MBTI 업데이트 실패 - 사용자: ${currentUser?.name}, MBTI 유효성: ${MbtiData.isValid(mbtiType)}');
     }
     return null;
   }

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../services/location_weather_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 import '../services/event_service.dart';
 import '../services/chat_briefing_service.dart';
-import '../services/chat_service.dart';
 import '../services/settings_service.dart';
+import '../services/chat_service.dart';
 import '../models/event.dart';
 import '../widgets/event_form.dart';
 import '../widgets/weather_widget.dart';
@@ -14,6 +15,7 @@ import '../widgets/learning_widget.dart';
 import '../widgets/style_widget.dart';
 import '../widgets/travel_widget.dart';
 import 'chat_screen.dart';
+import '../services/location_weather_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -34,12 +36,14 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   bool _isAiLoading = false;
   Set<String> _selectedAiModes = {'weather'}; // 기본값
+  List<String> _cardOrder = ['weatherAndAi', 'events', 'weather', 'location', 'health', 'learning', 'style', 'travel']; // 카드 순서
 
   @override
   void initState() {
     super.initState();
     _loadHomeData();
     _loadAiModeSettings();
+    _loadCardOrderSettings();
   }
 
   @override
@@ -90,6 +94,270 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       print('AI 모드 설정 로드 실패: $e');
     }
+  }
+
+  // 카드 순서 설정 로드
+  Future<void> _loadCardOrderSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedOrder = prefs.getStringList('cardOrder');
+      if (mounted && savedOrder != null) {
+        setState(() {
+          _cardOrder = savedOrder;
+        });
+      }
+    } catch (e) {
+      print('카드 순서 설정 로드 실패: $e');
+    }
+  }
+
+  // 카드 순서 변경
+  Future<void> _updateCardOrder(int oldIndex, int newIndex) async {
+    if (oldIndex < newIndex) {
+      newIndex -= 1;
+    }
+    setState(() {
+      final item = _cardOrder.removeAt(oldIndex);
+      _cardOrder.insert(newIndex, item);
+    });
+    
+    // 설정 저장
+    try {
+      await _saveCardOrderSettings();
+    } catch (e) {
+      print('카드 순서 저장 실패: $e');
+    }
+  }
+
+  // 카드 순서 설정 저장
+  Future<void> _saveCardOrderSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('cardOrder', _cardOrder);
+    } catch (e) {
+      print('카드 순서 설정 저장 실패: $e');
+    }
+  }
+
+  // 카드 위젯 반환
+  Widget _buildCardWidget(String cardType) {
+    switch (cardType) {
+      case 'weatherAndAi':
+        return _buildWeatherAndAiCard(); // 고정으로 항상 표시
+      case 'weather':
+        return _selectedAiModes.contains('weather')
+            ? const WeatherWidget(
+                isEnabled: true,
+              )
+            : const SizedBox.shrink();
+      case 'location':
+        return _selectedAiModes.contains('location')
+            ? const LocationWidget(
+                isEnabled: true,
+              )
+            : const SizedBox.shrink();
+      case 'events':
+        return _buildTodayEventsCard();
+      case 'health':
+        return _selectedAiModes.contains('health')
+            ? const HealthWidget(
+                isEnabled: true,
+              )
+            : const SizedBox.shrink();
+      case 'learning':
+        return _selectedAiModes.contains('learning')
+            ? const LearningWidget(
+                isEnabled: true,
+              )
+            : const SizedBox.shrink();
+      case 'style':
+        return _selectedAiModes.contains('style')
+            ? const StyleWidget(
+                isEnabled: true,
+              )
+            : const SizedBox.shrink();
+      case 'travel':
+        return _selectedAiModes.contains('travel')
+            ? const TravelWidget(
+                isEnabled: true,
+              )
+            : const SizedBox.shrink();
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildWeatherAndAiCard() {
+    return Card(
+      margin: const EdgeInsets.all(16),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 날씨 정보 섹션
+            if (_weatherData != null) ...[
+              Row(
+                children: [
+                  // 날씨 아이콘
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade100,
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: const Icon(
+                      Icons.wb_sunny,
+                      size: 30,
+                      color: Colors.orange,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on,
+                              size: 16,
+                              color: Colors.grey.shade600,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                _currentAddress ?? '위치 정보 없음',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey.shade600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${_weatherData?['main']?['temp']?.toString() ?? 'N/A'}°C',
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          _weatherData?['weather']?[0]?['description'] ?? '날씨 정보 없음',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ] else ...[
+              // 날씨 로딩 상태
+              Row(
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: const Icon(
+                      Icons.wb_sunny,
+                      size: 30,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '날씨 정보를 불러오는 중...',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+            
+            // AI 추천 섹션
+            Row(
+              children: [
+                const Icon(Icons.psychology, color: Colors.purple),
+                const SizedBox(width: 8),
+                const Text(
+                  'AI 비서 추천',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                if (_isAiLoading)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'AI 분석 중...',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (_aiRecommendation == null && !_isAiLoading)
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'AI가 오늘 일정을 분석하고 있습니다...',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              )
+            else if (_aiRecommendation != null)
+              Text(
+                _aiRecommendation!,
+                style: const TextStyle(
+                  fontSize: 16,
+                  height: 1.5,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _loadWeatherData() async {
@@ -154,6 +422,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // 일정을 터치했을 때 AI와 대화 시작
   void _onEventTap(Event event) {
+    // ChatProvider 초기화
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    chatProvider.clearMessages();
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -283,179 +555,6 @@ class _HomeScreenState extends State<HomeScreen> {
             child: const Text('삭제', style: TextStyle(color: Colors.red)),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildWeatherAndAiCard() {
-    return Card(
-      margin: const EdgeInsets.all(16),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 날씨 정보 섹션
-            if (_weatherData != null) ...[
-              Row(
-                children: [
-                  // 날씨 아이콘
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade100,
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: const Icon(
-                      Icons.wb_sunny,
-                      size: 30,
-                      color: Colors.orange,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.location_on,
-                              size: 16,
-                              color: Colors.grey.shade600,
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                _currentAddress ?? '위치 정보 없음',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey.shade600,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${_weatherData!['main']?['temp']?.toString() ?? 'N/A'}°C',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          _weatherData!['weather']?[0]?['description'] ?? '날씨 정보 없음',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-            ] else ...[
-              // 날씨 로딩 상태
-              Row(
-                children: [
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: const Icon(
-                      Icons.wb_sunny,
-                      size: 30,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '날씨 정보를 불러오는 중...',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-            ],
-            
-            // AI 추천 섹션
-            Row(
-              children: [
-                const Icon(Icons.psychology, color: Colors.purple),
-                const SizedBox(width: 8),
-                const Text(
-                  'AI 비서 추천',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                if (_isAiLoading)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'AI 분석 중...',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (_aiRecommendation == null && !_isAiLoading)
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'AI가 오늘 일정을 분석하고 있습니다...',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              )
-            else if (_aiRecommendation != null)
-              Text(
-                _aiRecommendation!,
-                style: const TextStyle(
-                  fontSize: 16,
-                  height: 1.5,
-                ),
-              ),
-          ],
-        ),
       ),
     );
   }
@@ -643,96 +742,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildLoadingCard(String message) {
-    return Card(
-      margin: const EdgeInsets.all(16),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Center(
-          child: Column(
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(height: 16),
-              Text(
-                message,
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAiModeWidgets() {
-    return Column(
-      children: [
-        // Weather Widget
-        if (_selectedAiModes.contains('weather'))
-          WeatherWidget(
-            isEnabled: true,
-            onTap: () {
-              // 날씨 위젯 탭 시 동작
-              print('날씨 위젯 탭됨');
-            },
-          ),
-        
-        // Location Widget
-        if (_selectedAiModes.contains('location'))
-          LocationWidget(
-            isEnabled: true,
-            onTap: () {
-              // 위치 위젯 탭 시 동작
-              print('위치 위젯 탭됨');
-            },
-          ),
-        
-        // Health Widget
-        if (_selectedAiModes.contains('health'))
-          HealthWidget(
-            isEnabled: true,
-            onTap: () {
-              // 건강 위젯 탭 시 동작
-              print('건강 위젯 탭됨');
-            },
-          ),
-        
-        // Learning Widget
-        if (_selectedAiModes.contains('learning'))
-          LearningWidget(
-            isEnabled: true,
-            onTap: () {
-              // 학습 위젯 탭 시 동작
-              print('학습 위젯 탭됨');
-            },
-          ),
-        
-        // Style Widget
-        if (_selectedAiModes.contains('style'))
-          StyleWidget(
-            isEnabled: true,
-            onTap: () {
-              // 스타일 위젯 탭 시 동작
-              print('스타일 위젯 탭됨');
-            },
-          ),
-        
-        // Travel Widget
-        if (_selectedAiModes.contains('travel'))
-          TravelWidget(
-            isEnabled: true,
-            onTap: () {
-              // 여행 위젯 탭 시 동작
-              print('여행 위젯 탭됨');
-            },
-          ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -740,56 +749,60 @@ class _HomeScreenState extends State<HomeScreen> {
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _loadHomeData,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 상단 헤더
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.blue.shade400, Colors.blue.shade600],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                      ),
-                      child: SafeArea(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _getGreeting(),
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              DateFormat('yyyy년 M월 d일 EEEE', 'ko_KR').format(DateTime.now()),
-                              style: const TextStyle(
-                                fontSize: 16,
-                                color: Colors.white70,
-                              ),
-                            ),
-                          ],
-                        ),
+              child: Column(
+                children: [
+                  // 상단 헤더 (고정)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.blue.shade400, Colors.blue.shade600],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
                     ),
-                    
-                    // 날씨 카드
-                    _buildWeatherAndAiCard(),
-                    // 오늘 일정 카드
-                    _buildTodayEventsCard(),                   
-                    // AI 모드 위젯들
-                    _buildAiModeWidgets(),
-                    const SizedBox(height: 20),
-                  ],
-                ),
+                    child: SafeArea(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _getGreeting(),
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            DateFormat('yyyy년 M월 d일 EEEE', 'ko_KR').format(DateTime.now()),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  
+                  // 드래그 가능한 카드들
+                  Expanded(
+                    child: ReorderableListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      onReorder: _updateCardOrder,
+                      itemCount: _cardOrder.length,
+                      itemBuilder: (context, index) {
+                        final cardType = _cardOrder[index];
+                        return Container(
+                          key: ValueKey(cardType),
+                          child: _buildCardWidget(cardType),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
     );

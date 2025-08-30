@@ -159,7 +159,6 @@ class ChatProvider with ChangeNotifier {
   final List<types.Message> _messages = [];
   final List<Map<String, dynamic>> _conversationHistory = [];
   bool _isLoading = false;
-  String _currentUserMbti = '';
 
   // 사용자 정의
   final _user = const types.User(id: 'user');
@@ -180,7 +179,6 @@ class ChatProvider with ChangeNotifier {
   /// Getters
   List<types.Message> get messages => _messages;
   bool get isLoading => _isLoading;
-  String get currentMbti => _currentUserMbti;
 
   ChatProvider() {
     _initializeServices();
@@ -229,6 +227,9 @@ class ChatProvider with ChangeNotifier {
     _setLoading(true);
 
     try {
+      // MBTI 캐시 무효화 (프로그램 시작 시)
+      _mbtiService.invalidateMbtiCache();
+      
       // PromptService 초기화 (MBTI 캐싱)
       await _promptService.initialize();
       
@@ -272,9 +273,6 @@ class ChatProvider with ChangeNotifier {
       if (await _handleLocalQueries(processedText)) {
         return;
       }
-
-      // MBTI 업데이트
-      _currentUserMbti = await _mbtiService.getCurrentMbtiType();
 
       // AI 응답 생성
       await _processAIResponse(processedText);
@@ -349,10 +347,6 @@ class ChatProvider with ChangeNotifier {
       final responseText = followUpResponse.text ?? '처리되었습니다.';
       _addAIMessage(responseText);
 
-      // MBTI 변경 처리
-      if (call.name == 'setMbtiType') {
-        _currentUserMbti = await _mbtiService.getCurrentMbtiType();
-      }
     } catch (e) {
       _addErrorMessage('기능 처리 중 오류가 발생했습니다: $e');
     }
@@ -436,6 +430,13 @@ class ChatProvider with ChangeNotifier {
   /// 외부 인터페이스 메서드들
   void addAssistantText(String text) => _addAIMessage(text);
   void addUserText(String text) => _addUserMessage(text);
+  
+  /// 메시지 초기화
+  void clearMessages() {
+    _messages.clear();
+    _conversationHistory.clear();
+    notifyListeners();
+  }
 
   String _randomString() {
     final random = Random.secure();

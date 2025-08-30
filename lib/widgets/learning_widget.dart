@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../screens/chat_screen.dart';
+import '../services/chat_service.dart';
 
 class LearningWidget extends StatefulWidget {
   final bool isEnabled;
@@ -95,6 +98,78 @@ class _LearningWidgetState extends State<LearningWidget> {
     }
   }
 
+  // 채팅 화면 표시
+  void _showChatScreen() {
+    // ChatProvider 초기화
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    chatProvider.clearMessages();
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // 드래그 핸들
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // 헤더
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.school,
+                      color: Colors.blue,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      '학습 AI 비서',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              // AI 채팅 화면
+              Expanded(
+                child: ChatScreen(
+                  initialEvent: null,
+                  initialTopic: '학습',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!widget.isEnabled) {
@@ -102,10 +177,10 @@ class _LearningWidgetState extends State<LearningWidget> {
     }
 
     return GestureDetector(
-      onTap: widget.onTap,
+      onTap: _showChatScreen,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [Colors.teal.shade300, Colors.teal.shade500],
@@ -129,7 +204,7 @@ class _LearningWidgetState extends State<LearningWidget> {
                 Icon(
                   Icons.school,
                   color: Colors.white,
-                  size: 24,
+                  size: 22,
                 ),
                 const SizedBox(width: 8),
                 const Text(
@@ -144,11 +219,11 @@ class _LearningWidgetState extends State<LearningWidget> {
                 Icon(
                   Icons.lightbulb,
                   color: Colors.white,
-                  size: 20,
+                  size: 18,
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 11),
             Text(
               _learningTip,
               style: const TextStyle(
@@ -157,7 +232,7 @@ class _LearningWidgetState extends State<LearningWidget> {
                 fontWeight: FontWeight.w500,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 7),
             Text(
               _motivationMessage,
               style: const TextStyle(
@@ -165,7 +240,7 @@ class _LearningWidgetState extends State<LearningWidget> {
                 fontSize: 12,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 7),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(

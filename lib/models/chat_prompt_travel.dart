@@ -14,6 +14,7 @@ class ChatPromptTravelService {
 - 예약 필요 항목은 checklist.create, 확정 시간은 event.create로 분리.
 - 로밍·비자·현지 결제 준비 리마인더 포함.
 - 친근하고 구체적인 여행 조언을 제공하세요.
+- 200-300자로 응답하세요.
 </rules>
 
 ### <examples>

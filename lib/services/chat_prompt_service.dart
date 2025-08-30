@@ -1,8 +1,7 @@
-
 import 'package:intl/intl.dart';
 import '../models/chat_mbti.dart';
 import '../models/event.dart';
-import 'user_service.dart';
+import 'chat_mbti_service.dart';
 
 class PromptService {
   static final PromptService _instance = PromptService._internal();
@@ -19,9 +18,9 @@ class PromptService {
     if (_isInitialized) return;
     
     try {
-      final userService = UserService();
-      final user = await userService.getCurrentUser();
-      await _updateMbtiCache(user?.mbtiType ?? 'INFP');
+      final mbtiService = MbtiService();
+      final mbtiType = await mbtiService.getCurrentMbtiType();
+      await _updateMbtiCache(mbtiType);
       _isInitialized = true;
       print('✅ PromptService 초기화 완료 (MBTI: $_cachedMbtiType)');
     } catch (e) {

@@ -8,14 +8,109 @@ import 'map_screen.dart';
 import '../services/chat_briefing_service.dart';
 import '../services/location_weather_service.dart';
 import '../models/event.dart';
+import '../services/chat_personalize_service.dart';
 
-class ChatScreen extends StatelessWidget {
+class ChatScreen extends StatefulWidget {
   final Event? initialEvent;
+  final String? initialTopic;
   
   const ChatScreen({
     super.key,
     this.initialEvent,
+    this.initialTopic,
   });
+
+  @override
+  State<ChatScreen> createState() => _ChatScreenState();
+}
+
+class _ChatScreenState extends State<ChatScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // ChatScreen에 처음 들어올 때 메시지 초기화
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = Provider.of<ChatProvider>(context, listen: false);
+      provider.clearMessages();
+    });
+  }
+
+  // 토픽별 인사말 반환
+  String _getTopicGreeting(String topic) {
+    switch (topic) {
+      case '날씨':
+        return '안녕하세요! 날씨 AI 비서입니다. 🌤️\n\n오늘 날씨에 대해 궁금한 점이 있으시거나, 날씨 관련 조언이 필요하시면 언제든 말씀해주세요!';
+      case '위치':
+        return '안녕하세요! 위치 AI 비서입니다. 📍\n\n현재 위치나 주변 정보에 대해 궁금한 점이 있으시면 언제든 말씀해주세요!';
+      case '건강':
+        return '안녕하세요! 건강 AI 비서입니다. 💪\n\n건강 관리나 운동에 대한 조언이 필요하시면 언제든 말씀해주세요!';
+      case '학습':
+        return '안녕하세요! 학습 AI 비서입니다. 📚\n\n학습 방법이나 동기부여가 필요하시면 언제든 말씀해주세요!';
+      case '스타일':
+        return '안녕하세요! 스타일 AI 비서입니다. 👗\n\n패션이나 스타일링에 대한 조언이 필요하시면 언제든 말씀해주세요!';
+      case '여행':
+        return '안녕하세요! 여행 AI 비서입니다. ✈️\n\n여행 계획이나 추천이 필요하시면 언제든 말씀해주세요!';
+      default:
+        return '안녕하세요! 무엇을 도와드릴까요?';
+    }
+  }
+
+  // 토픽별 개인화된 응답 처리
+  Future<void> _handlePersonalizedResponse(ChatProvider provider, String userMessage, String topic) async {
+    // 사용자 메시지 추가
+    provider.addUserText(userMessage);
+    
+    try {
+      final personalizeService = ChatPersonalizeService();
+      String selectedType = 'general';
+      Map<String, String> contextData = {};
+
+      // 토픽별 타입과 컨텍스트 데이터 설정
+      switch (topic) {
+        case '건강':
+          selectedType = 'health';
+          // 건강 관련 컨텍스트 데이터 수집
+          final locationWeatherService = LocationWeatherService();
+          final weather = await locationWeatherService.fetchAndSaveLocationWeather();
+          if (weather != null) {
+            contextData['localWeather'] = '현재 날씨: ${weather['weather']?[0]?['description']}, 온도: ${weather['main']?['temp']}°C';
+          }
+          break;
+        case '학습':
+          selectedType = 'learning';
+          // 학습 관련 컨텍스트 데이터 수집
+          contextData['deadlines'] = '현재 시점: ${DateTime.now().toString()}';
+          break;
+        case '스타일':
+          selectedType = 'style';
+          // 스타일 관련 컨텍스트 데이터 수집
+          final locationWeatherService = LocationWeatherService();
+          final weather = await locationWeatherService.fetchAndSaveLocationWeather();
+          if (weather != null) {
+            contextData['forecastByEvent'] = '현재 날씨: ${weather['weather']?[0]?['description']}, 온도: ${weather['main']?['temp']}°C';
+          }
+          break;
+        case '여행':
+          selectedType = 'travel';
+          // 여행 관련 컨텍스트 데이터 수집
+          contextData['tripOverview'] = '여행 계획에 대한 조언을 제공합니다.';
+          break;
+      }
+
+      // 개인화된 응답 생성
+      final response = await personalizeService.generatePersonalizedResponse(
+        userMessage: userMessage,
+        selectedType: selectedType,
+        contextData: contextData,
+        // conversationHistory: conversationHistory,
+      );
+
+      provider.addAssistantText(response);
+    } catch (e) {
+      print('❌ 개인화된 응답 생성 실패: $e');
+      provider.addAssistantText('죄송합니다. 응답을 생성하는 중 오류가 발생했습니다.');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,9 +142,9 @@ class ChatScreen extends StatelessWidget {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 // 이중 추가 방지: 콜백 시점에 빈 경우에만
                 if (provider.messages.isEmpty) {
-                  if (initialEvent != null) {
+                  if (widget.initialEvent != null) {
                     // 일정이 있는 경우 해당 일정에 대한 대화 시작
-                    final event = initialEvent!;
+                    final event = widget.initialEvent!;
                     final startTime = '${event.startTime.hour.toString().padLeft(2, '0')}:${event.startTime.minute.toString().padLeft(2, '0')}';
                     final endTime = '${event.endTime.hour.toString().padLeft(2, '0')}:${event.endTime.minute.toString().padLeft(2, '0')}';
                     
@@ -65,6 +160,10 @@ class ChatScreen extends StatelessWidget {
                     eventDescription += '\n이 일정에 대해 궁금한 점이 있으시거나 도움이 필요한 부분이 있으시면 언제든 말씀해주세요!';
                     
                     provider.addAssistantText(eventDescription);
+                  } else if (widget.initialTopic != null) {
+                    // 토픽 기반 채팅 시작
+                    String topicGreeting = _getTopicGreeting(widget.initialTopic!);
+                    provider.addAssistantText(topicGreeting);
                   } else {
                     // 일반적인 인사말
                     provider.addAssistantText('안녕하세요! 무엇을 도와드릴까요?');
@@ -140,9 +239,15 @@ class ChatScreen extends StatelessWidget {
                     return;
                   }
                   
-                                     // 일반적인 대화 처리
-                   provider.addUserText(text);
-                   await provider.sendMessage(partial);
+                                                        // 토픽별 개인화된 응답 처리
+                  if (widget.initialTopic != null && ['건강', '학습', '스타일', '여행'].contains(widget.initialTopic)) {
+                    await _handlePersonalizedResponse(provider, text, widget.initialTopic!);
+                    return;
+                  } else {
+                    // 일반적인 대화 처리
+                    await provider.sendMessage(partial);
+                    return;
+                  }
                 },
                 theme: DefaultChatTheme(
                   primaryColor: Colors.blue,
