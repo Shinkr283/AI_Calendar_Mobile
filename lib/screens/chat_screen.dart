@@ -13,12 +13,8 @@ import '../services/chat_personalize_service.dart';
 class ChatScreen extends StatefulWidget {
   final Event? initialEvent;
   final String? initialTopic;
-  
-  const ChatScreen({
-    super.key,
-    this.initialEvent,
-    this.initialTopic,
-  });
+
+  const ChatScreen({super.key, this.initialEvent, this.initialTopic});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -56,10 +52,14 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   // 토픽별 개인화된 응답 처리
-  Future<void> _handlePersonalizedResponse(ChatProvider provider, String userMessage, String topic) async {
+  Future<void> _handlePersonalizedResponse(
+    ChatProvider provider,
+    String userMessage,
+    String topic,
+  ) async {
     // 사용자 메시지 추가
     provider.addUserText(userMessage);
-    
+
     try {
       final personalizeService = ChatPersonalizeService();
       String selectedType = 'general';
@@ -71,9 +71,11 @@ class _ChatScreenState extends State<ChatScreen> {
           selectedType = 'health';
           // 건강 관련 컨텍스트 데이터 수집
           final locationWeatherService = LocationWeatherService();
-          final weather = await locationWeatherService.fetchAndSaveLocationWeather();
+          final weather = await locationWeatherService
+              .fetchAndSaveLocationWeather();
           if (weather != null) {
-            contextData['localWeather'] = '현재 날씨: ${weather['weather']?[0]?['description']}, 온도: ${weather['main']?['temp']}°C';
+            contextData['localWeather'] =
+                '현재 날씨: ${weather['weather']?[0]?['description']}, 온도: ${weather['main']?['temp']}°C';
           }
           break;
         case '학습':
@@ -85,9 +87,11 @@ class _ChatScreenState extends State<ChatScreen> {
           selectedType = 'style';
           // 스타일 관련 컨텍스트 데이터 수집
           final locationWeatherService = LocationWeatherService();
-          final weather = await locationWeatherService.fetchAndSaveLocationWeather();
+          final weather = await locationWeatherService
+              .fetchAndSaveLocationWeather();
           if (weather != null) {
-            contextData['forecastByEvent'] = '현재 날씨: ${weather['weather']?[0]?['description']}, 온도: ${weather['main']?['temp']}°C';
+            contextData['forecastByEvent'] =
+                '현재 날씨: ${weather['weather']?[0]?['description']}, 온도: ${weather['main']?['temp']}°C';
           }
           break;
         case '여행':
@@ -128,15 +132,12 @@ class _ChatScreenState extends State<ChatScreen> {
                   children: const [
                     CircularProgressIndicator(),
                     SizedBox(height: 8),
-                    Text(
-                      '잠시만 기다려주세요.',
-                      style: TextStyle(fontSize: 16),
-                    ),
+                    Text('잠시만 기다려주세요.', style: TextStyle(fontSize: 16)),
                   ],
                 ),
               );
             }
-            
+
             // 최초 진입 시 인사말 또는 일정 관련 대화 시작
             if (!provider.isLoading && provider.messages.isEmpty) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -145,10 +146,13 @@ class _ChatScreenState extends State<ChatScreen> {
                   if (widget.initialEvent != null) {
                     // 일정이 있는 경우 해당 일정에 대한 대화 시작
                     final event = widget.initialEvent!;
-                    final startTime = '${event.startTime.hour.toString().padLeft(2, '0')}:${event.startTime.minute.toString().padLeft(2, '0')}';
-                    final endTime = '${event.endTime.hour.toString().padLeft(2, '0')}:${event.endTime.minute.toString().padLeft(2, '0')}';
-                    
-                    String eventDescription = '${event.title} 일정에 대해 이야기해보겠습니다.\n\n';
+                    final startTime =
+                        '${event.startTime.hour.toString().padLeft(2, '0')}:${event.startTime.minute.toString().padLeft(2, '0')}';
+                    final endTime =
+                        '${event.endTime.hour.toString().padLeft(2, '0')}:${event.endTime.minute.toString().padLeft(2, '0')}';
+
+                    String eventDescription =
+                        '${event.title} 일정에 대해 이야기해보겠습니다.\n\n';
                     eventDescription += '📅 일정: ${event.title}\n';
                     eventDescription += '⏰ 시간: $startTime ~ $endTime\n';
                     if (event.location.isNotEmpty) {
@@ -157,12 +161,15 @@ class _ChatScreenState extends State<ChatScreen> {
                     if (event.description.isNotEmpty) {
                       eventDescription += '📝 설명: ${event.description}\n';
                     }
-                    eventDescription += '\n이 일정에 대해 궁금한 점이 있으시거나 도움이 필요한 부분이 있으시면 언제든 말씀해주세요!';
-                    
+                    eventDescription +=
+                        '\n이 일정에 대해 궁금한 점이 있으시거나 도움이 필요한 부분이 있으시면 언제든 말씀해주세요!';
+
                     provider.addAssistantText(eventDescription);
                   } else if (widget.initialTopic != null) {
                     // 토픽 기반 채팅 시작
-                    String topicGreeting = _getTopicGreeting(widget.initialTopic!);
+                    String topicGreeting = _getTopicGreeting(
+                      widget.initialTopic!,
+                    );
                     provider.addAssistantText(topicGreeting);
                   } else {
                     // 일반적인 인사말
@@ -172,21 +179,25 @@ class _ChatScreenState extends State<ChatScreen> {
               });
             }
 
-                         return Container(
-               color: Theme.of(context).scaffoldBackgroundColor,
-               child: Chat(
-                 user: user,
-                 messages: provider.messages,
+            return Container(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              child: Chat(
+                user: user,
+                messages: provider.messages,
                 onSendPressed: (partial) async {
                   final text = partial.text.trim();
                   // 날짜별 브리핑 요청: 'YYYY-MM-DD 브리핑'
-                  final dateBrf = RegExp(r"^(\d{4})[-.](\d{1,2})[-.](\d{1,2})\s*브리핑").firstMatch(text);
+                  final dateBrf = RegExp(
+                    r"^(\d{4})[-.](\d{1,2})[-.](\d{1,2})\s*브리핑",
+                  ).firstMatch(text);
                   if (dateBrf != null) {
                     final y = int.parse(dateBrf.group(1)!);
                     final m = int.parse(dateBrf.group(2)!);
                     final d = int.parse(dateBrf.group(3)!);
                     final date = DateTime(y, m, d);
-                    final briefing = await BriefingService().getBriefingForDate(date);
+                    final briefing = await BriefingService().getBriefingForDate(
+                      date,
+                    );
                     provider.addAssistantText(briefing);
                     return;
                   }
@@ -203,51 +214,84 @@ class _ChatScreenState extends State<ChatScreen> {
                     final place = await PlacesService.geocodeAddress(location);
                     if (place != null) {
                       final locationWeatherService = LocationWeatherService();
-                      final weather = await locationWeatherService.fetchWeather(place.latitude, place.longitude);
+                      final weather = await locationWeatherService.fetchWeather(
+                        place.latitude,
+                        place.longitude,
+                      );
                       if (weather != null) {
-                        final desc = (weather['weather']?[0]?['description'] ?? '').toString();
-                        final temp = (weather['main']?['temp'] ?? '').toString();
-                        provider.addAssistantText('"${place.address}"의 날씨: $desc, 기온: ${temp}°C');
+                        final desc =
+                            (weather['weather']?[0]?['description'] ?? '')
+                                .toString();
+                        final temp = (weather['main']?['temp'] ?? '')
+                            .toString();
+                        provider.addAssistantText(
+                          '"${place.address}"의 날씨: $desc, 기온: ${temp}°C',
+                        );
                       } else {
-                        provider.addAssistantText('죄송합니다. "${place.address}"의 날씨 정보를 가져올 수 없습니다.');
+                        provider.addAssistantText(
+                          '죄송합니다. "${place.address}"의 날씨 정보를 가져올 수 없습니다.',
+                        );
                       }
                     } else {
-                      provider.addAssistantText('죄송합니다. "$location" 위치를 찾을 수 없습니다.');
+                      provider.addAssistantText(
+                        '죄송합니다. "$location" 위치를 찾을 수 없습니다.',
+                      );
                     }
                     return;
                   }
                   // '<장소> 위치' 요청: 먼저 사용자 발화를 채팅에 남기고, 그 다음 지도 화면으로 이동
-                  final locMatch = RegExp(r'(.+?)\s*(위치|장소)\s*(보여줘|알려줘)').firstMatch(text);
+                  final locMatch = RegExp(
+                    r'(.+?)\s*(위치|장소)\s*(보여줘|알려줘)',
+                  ).firstMatch(text);
                   if (locMatch != null) {
                     final location = locMatch.group(1)!.trim();
                     provider.addUserText(text);
                     final place = await PlacesService.geocodeAddress(location);
                     if (place != null) {
-                                             Navigator.of(context).push(
-                         MaterialPageRoute(
-                           builder: (context) => MapScreen(
-                             initialLat: place.latitude,
-                             initialLon: place.longitude,
-                             initialAddress: place.address,
-                           ),
-                         ),
-                       );
-                      provider.addAssistantText('"${place.address}"의 위치를 지도에서 확인해보세요!');
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => MapScreen(
+                            initialLat: place.latitude,
+                            initialLon: place.longitude,
+                            initialAddress: place.address,
+                          ),
+                        ),
+                      );
+                      provider.addAssistantText(
+                        '"${place.address}"의 위치를 지도에서 확인해보세요!',
+                      );
                     } else {
-                      provider.addAssistantText('죄송합니다. "$location" 위치를 찾을 수 없습니다.');
+                      provider.addAssistantText(
+                        '죄송합니다. "$location" 위치를 찾을 수 없습니다.',
+                      );
                     }
                     return;
                   }
-                  
-                                                        // 토픽별 개인화된 응답 처리
-                  if (widget.initialTopic != null && ['건강', '학습', '스타일', '여행'].contains(widget.initialTopic)) {
-                    await _handlePersonalizedResponse(provider, text, widget.initialTopic!);
-                    return;
-                  } else {
-                    // 일반적인 대화 처리
-                    await provider.sendMessage(partial);
-                    return;
+
+                  // 토픽별 개인화된 응답 처리
+                  if (widget.initialTopic != null) {
+                    if (widget.initialTopic == '위치') {
+                      // 위치 토픽의 일반적인 대화 처리
+                      await provider.sendMessage(partial);
+                      return;
+                    } else if ([
+                      '건강',
+                      '학습',
+                      '스타일',
+                      '여행',
+                    ].contains(widget.initialTopic)) {
+                      await _handlePersonalizedResponse(
+                        provider,
+                        text,
+                        widget.initialTopic!,
+                      );
+                      return;
+                    }
                   }
+
+                  // 일반적인 대화 처리
+                  await provider.sendMessage(partial);
+                  return;
                 },
                 theme: DefaultChatTheme(
                   primaryColor: Colors.blue,
@@ -262,4 +306,4 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
   }
-} 
+}

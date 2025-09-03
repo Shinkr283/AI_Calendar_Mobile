@@ -7,7 +7,7 @@ class GeminiService {
   factory GeminiService() => _instance;
   GeminiService._internal();
 
-  final String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+  final String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
 
   // 메시지 전송
   Future<GeminiResponse> sendMessage({

@@ -35,7 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _currentAddress;
   bool _isLoading = true;
   bool _isAiLoading = false;
-  Set<String> _selectedAiModes = {'weather'}; // 기본값
+  Set<String> _selectedAiModes = {''}; // 기본값
   List<String> _cardOrder = ['weatherAndAi', 'events', 'weather', 'location', 'health', 'learning', 'style', 'travel']; // 카드 순서
 
   @override
@@ -87,7 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _selectedAiModes = Set<String>.from(
-            settings['selectedAiModes'] ?? ['weather'],
+            settings['selectedAiModes'] ?? [''],
           );
         });
       }

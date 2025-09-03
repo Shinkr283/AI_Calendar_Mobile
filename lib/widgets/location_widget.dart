@@ -165,6 +165,96 @@ class _LocationWidgetState extends State<LocationWidget> {
     );
   }
 
+  // 맛집 추천 채팅 화면 표시
+  void _showRestaurantRecommendationChat() async {
+    // ChatProvider 초기화
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    chatProvider.clearMessages();
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // 드래그 핸들
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // 헤더
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.restaurant,
+                      color: Colors.orange,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      '맛집 추천',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              // AI 채팅 화면
+              Expanded(
+                child: ChatScreen(
+                  initialEvent: null,
+                  initialTopic: '위치',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    // 잠시 후 맛집 추천 자동 실행
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (mounted) {
+      // 현재 위치 정보가 있으면 맛집 추천 실행
+      if (_currentAddress.isNotEmpty && _currentAddress != '위치 정보 없음') {
+        await chatProvider.handleRestaurantRecommendationRequest('맛집 추천해줘');
+      } else {
+        // 위치 정보가 없으면 위치 업데이트 후 맛집 추천
+        await _loadLocationData();
+        await Future.delayed(const Duration(seconds: 1));
+        if (_currentAddress.isNotEmpty && _currentAddress != '위치 정보 없음') {
+          await chatProvider.handleRestaurantRecommendationRequest('맛집 추천해줘');
+        } else {
+          chatProvider.addAssistantText('위치 정보를 가져올 수 없어 맛집 추천이 어렵습니다. 위치 권한을 확인해주세요.');
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!widget.isEnabled) {
@@ -220,7 +310,18 @@ class _LocationWidgetState extends State<LocationWidget> {
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   )
-                else
+                else ...[
+                  // 맛집 추천 아이콘
+                  IconButton(
+                    icon: const Icon(
+                      Icons.restaurant,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    onPressed: _showRestaurantRecommendationChat,
+                    tooltip: '맛집 추천',
+                  ),
+                  // 위치 새로고침 아이콘
                   IconButton(
                     icon: const Icon(
                       Icons.refresh,
@@ -230,6 +331,7 @@ class _LocationWidgetState extends State<LocationWidget> {
                     onPressed: _loadLocationData,
                     tooltip: '위치 새로고침',
                   ),
+                ],
               ],
             ),
             const SizedBox(height: 7),

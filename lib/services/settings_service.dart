@@ -99,7 +99,7 @@ class SettingsService {
   // AI 모드 설정 (다중 선택 지원)
   Future<List<String>> getSelectedAiModes() async {
     await _initPrefs();
-    return _prefs!.getStringList(_selectedAiModeKey) ?? ['health'];
+    return _prefs!.getStringList(_selectedAiModeKey) ?? [''];
   }
 
   Future<void> setSelectedAiModes(List<String> modes) async {
@@ -110,7 +110,7 @@ class SettingsService {
   // 기존 단일 선택 메서드 (하위 호환성)
   Future<String> getSelectedAiMode() async {
     final modes = await getSelectedAiModes();
-    return modes.isNotEmpty ? modes.first : 'health';
+    return modes.isNotEmpty ? modes.first : '';
   }
 
   Future<void> setSelectedAiMode(String mode) async {

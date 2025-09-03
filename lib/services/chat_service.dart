@@ -172,6 +172,7 @@ class ChatProvider with ChangeNotifier {
   late final ChatWeatherService _weatherService;
   late final ChatRecommendService _recommendService;
   late final BriefingService _briefingService;
+  late final ChatLocationService _locationService;
 
   // Function 처리 핸들러 맵
   late final Map<String, Function(GeminiFunctionCall)> _functionHandlers;
@@ -195,6 +196,7 @@ class ChatProvider with ChangeNotifier {
     _weatherService = ChatWeatherService();
     _recommendService = ChatRecommendService();
     _briefingService = BriefingService();
+    _locationService = ChatLocationService();
   }
 
   /// Function 핸들러 설정
@@ -215,7 +217,7 @@ class ChatProvider with ChangeNotifier {
       'getWeatherForTodayEvent': (call) => _weatherService.handleFunctionCall(call),
       
       // 장소 관련
-      'handleLocationQuery': (call) => ChatLocationService().handleLocationQuery(call.args['location'] as String),
+      'handleLocationQuery': (call) => _locationService.handleLocationQuery(call.args['location'] as String),
 
       // 맛집 추천 관련
       'getNearbyRestaurants': (call) => _recommendService.handleFunctionCall(call),
@@ -302,6 +304,25 @@ class ChatProvider with ChangeNotifier {
       return true;
     }
 
+    // 위치 관련 질문 처리
+    final locationQuery = RegExp(r'(현재\s*(위치|장소|어디|어느\s*곳)|내\s*(위치|장소|어디|어느\s*곳)|지금\s*(위치|장소|어디|어느\s*곳)|여기\s*(어디|어느\s*곳)|위치\s*(알려줘|보여줘|확인|찾아줘)|장소\s*(알려줘|보여줘|확인|찾아줘))');
+    if (locationQuery.hasMatch(text)) {
+      try {
+        _setLoading(true);
+        final locationInfo = await _locationService.handleLocationQuery(text);
+        if (locationInfo != null) {
+          _addAIMessage(locationInfo);
+        } else {
+          _addAIMessage('죄송합니다. 위치 정보를 처리할 수 없습니다.');
+        }
+      } catch (e) {
+        _addErrorMessage('위치 정보를 가져오는 중 오류가 발생했습니다: $e');
+      } finally {
+        _setLoading(false);
+      }
+      return true;
+    }
+
     return false;
   }
 
@@ -366,6 +387,69 @@ class ChatProvider with ChangeNotifier {
     } finally {
       _setLoading(false);
     }
+  }
+
+  /// 맛집 추천 요청 처리
+  Future<void> requestRestaurantRecommendation(String location) async {
+    _setLoading(true);
+    
+    try {
+      final result = await _recommendService.getDetailedRestaurantRecommendations(location);
+      
+      if (result['success']) {
+        final restaurants = result['restaurants'] as List<dynamic>;
+        final message = _formatRestaurantRecommendation(result['message'], restaurants);
+        _addAIMessage(message);
+      } else {
+        _addErrorMessage(result['message']);
+      }
+    } catch (e) {
+      _addErrorMessage('맛집 추천을 가져오는 중 오류가 발생했습니다: $e');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// 맛집 추천 요청 처리 (사용자 메시지 기반)
+  Future<void> handleRestaurantRecommendationRequest(String userMessage) async {
+    _setLoading(true);
+    
+    try {
+      final response = await _recommendService.handleRestaurantRecommendationRequest(userMessage);
+      _addAIMessage(response);
+    } catch (e) {
+      _addErrorMessage('맛집 추천을 가져오는 중 오류가 발생했습니다: $e');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// 맛집 추천 결과 포맷팅
+  String _formatRestaurantRecommendation(String status, List<dynamic> restaurants) {
+    final buffer = StringBuffer();
+    buffer.writeln(status);
+    buffer.writeln();
+    
+    for (int i = 0; i < restaurants.length; i++) {
+      final restaurant = restaurants[i];
+      final name = restaurant['name'] as String? ?? '';
+      final taste = restaurant['taste'] as String? ?? '';
+      final address = restaurant['address'] as String? ?? '';
+      final rating = restaurant['rating'] as String? ?? '';
+      final userRatingCount = restaurant['userRatingCount'] as String? ?? '';
+      
+      buffer.writeln('${i + 1}. 🍽️ $name');
+      if (taste.isNotEmpty) {
+        buffer.writeln('   🎯 $taste 맛집');
+      }
+      if (rating.isNotEmpty) {
+        buffer.writeln('   ⭐ 평점: $rating (리뷰 $userRatingCount개)');
+      }
+      buffer.writeln('   📍 $address');
+      if (i < restaurants.length - 1) buffer.writeln();
+    }
+    
+    return buffer.toString();
   }
 
   /// Function declarations 가져오기

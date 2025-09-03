@@ -28,11 +28,6 @@ import 'services/chat_prompt_service.dart';
 import 'providers/theme_provider.dart';
 import 'services/settings_service.dart';
 
-
-// 권한 요청 및 현재 위치 조회
-// 위치 권한 및 현재 위치는 LocationService에서 처리합니다.
-// KstTime 클래스 제거됨 (네이티브 알림 사용으로 더 이상 필요없음)
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Firebase 초기화
@@ -94,8 +89,6 @@ Future<void> _requestNotificationPermission() async {
   } catch (e) {
     print('❌ 알림 권한 확인 중 오류: $e');
   }
-
-// 중복된 runApp 호출 제거됨
 }
 
 /// 백그라운드에서 실행할 초기화 작업들
